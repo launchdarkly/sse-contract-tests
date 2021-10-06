@@ -52,10 +52,9 @@ func (m Message) String() string { return m.raw }
 // EventMessage contains the fields of an SSE event, exactly as it was received from the
 // test service's SSE client.
 type EventMessage struct {
-	Type  string `json:"type"`
-	Data  string `json:"data"`
-	ID    string `json:"id"`
-	Retry *int   `json:"retry"`
+	Type string `json:"type"`
+	Data string `json:"data"`
+	ID   string `json:"id"`
 }
 
 func newResponseStream(reader io.Reader, logger *log.Logger, canceller context.CancelFunc, timeout time.Duration) *ResponseStream {
