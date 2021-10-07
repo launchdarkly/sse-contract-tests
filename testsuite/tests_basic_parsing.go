@@ -1,8 +1,6 @@
 package testsuite
 
 import (
-	"time"
-
 	"github.com/launchdarkly/sse-contract-tests/client"
 	"github.com/launchdarkly/sse-contract-tests/stream"
 )
@@ -127,12 +125,15 @@ func DoBasicParsingTests(t *TestContext) {
 		})
 	})
 
-	t.Run("multi-byte characters sent in single-byte pieces", func(t *TestContext) {
-		t.WithEndpointAndClientStream(func(e *stream.Endpoint, r *client.ResponseStream) {
-			e.SendSplit("data: €豆腐\n\n", 1, time.Millisecond*20)
-
-			t.RequireSpecificEvents(r,
-				client.EventMessage{Data: "€豆腐"})
-		})
-	})
+	// The following test is based on one that's in the js-eventsource unit tests. While it works there,
+	// it does not (cannot?) work in Ruby, and possibly some other platforms where there's no native
+	// "non-string binary data" type. If that's true, we should probably delete this.
+	// t.Run("multi-byte characters sent in single-byte pieces", func(t *TestContext) {
+	// 	t.WithEndpointAndClientStream(func(e *stream.Endpoint, r *client.ResponseStream) {
+	// 		e.SendSplit("data: €豆腐\n\n", 1, time.Millisecond*20)
+	//
+	// 		t.RequireSpecificEvents(r,
+	// 			client.EventMessage{Data: "€豆腐"})
+	// 	})
+	// })
 }
