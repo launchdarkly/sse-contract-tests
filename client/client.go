@@ -87,32 +87,28 @@ WaitLoop:
 		if err != nil {
 			logger.Printf("Status request failed: %s", err)
 		} else {
-			if resp.StatusCode == 200 {
-				if resp.Body == nil {
-					logger.Printf("Status request successful, but no metadata")
-				} else {
-					respData, err := ioutil.ReadAll(resp.Body)
-					resp.Body.Close()
-					if err != nil {
-						return nil, err
-					}
-					logger.Printf("Status request returned metadata: %s", string(respData))
-					var statusResp clientStatusResponse
-					if err := json.Unmarshal(respData, &statusResp); err != nil {
-						return nil, fmt.Errorf("malformed status response from test service: %s", string(respData))
-					}
-					c.capabilities = statusResp.Capabilities
-				}
-				break WaitLoop
-			} else {
-				logger.Printf("Status request returned %d", resp.StatusCode)
+			if resp.StatusCode != 200 {
+				return nil, fmt.Errorf("test service returned status code %d", resp.StatusCode)
 			}
+			if resp.Body == nil {
+				logger.Printf("Status request successful, but no metadata")
+			} else {
+				respData, err := ioutil.ReadAll(resp.Body)
+				resp.Body.Close()
+				if err != nil {
+					return nil, err
+				}
+				logger.Printf("Status request returned metadata: %s", string(respData))
+				var statusResp clientStatusResponse
+				if err := json.Unmarshal(respData, &statusResp); err != nil {
+					return nil, fmt.Errorf("malformed status response from test service: %s", string(respData))
+				}
+				c.capabilities = statusResp.Capabilities
+			}
+			break WaitLoop
 		}
 		if !time.Now().Before(deadline) {
-			if err == nil {
-				err = fmt.Errorf("status code %d", resp.StatusCode)
-			}
-			return nil, fmt.Errorf("result of last query was: %s", err)
+			return nil, fmt.Errorf("timed out, result of last query was: %w", err)
 		}
 		time.Sleep(time.Millisecond * 50)
 	}
