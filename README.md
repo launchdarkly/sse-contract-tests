@@ -23,6 +23,35 @@ Options besides `--url`:
 
 For `--run` and `--skip`, the name of a test is the string that appears between brackets in the test output. This may have multiple segments delimited by slashes, such as `name of test category/name of subtest`.
 
+## Running with Docker
+
+In a CI job for an SSE implementation, the most convenient way to run the test suite is with Docker. The executable test harness is published as the Docker image `ldcircleci/sse-contract-tests:1`. This major version number will be updated if there is ever a non-backward-compatible change.
+
+Here's an example CircleCI fragment. It assumes that there is a Dockerfile in the current directory that will build and run the test service, listening on port 8000. It runs the service in one container, then runs the test harness in another container (note that you need to use `setup_remote_docker` so that the two containers can see each other across a shared network). At the end, it echoes the console output that was produced by the test service, in case that's helpful in diagnosing an error.
+
+```yaml
+      - setup_remote_docker
+
+      - run: docker build --tag testserviceimage .
+
+      - run: docker network create shared
+
+      - run:
+          name: run test service
+          command: docker run -d -p 8000:8000 --network shared --name testservice testserviceimage >service.log
+
+      - run:
+          name: run test harness
+          command: |
+            docker run -p 8111:8111 --network shared --name testharness ldcircleci/sse-contract-tests:1 \
+              --url http://testservice:8000 --host testharness
+      
+      - run:
+          name: show test service output
+          when: always
+          command: cat service.log
+```
+
 ## Test service endpoints
 
 ### Status resource: `GET /`
@@ -121,13 +150,3 @@ This message indicates that the test service has received an error from the SSE 
   "comment": "the error message"
 }
 ```
-
-## Writing tests
-
-The test suite is written in Go code, in the `ssetests` package.
-
-It does not use the Go test runner, but the API is deliberately similar to Go's `testing` package. The `ssetests.T` type implements the same basic methods as `testing.T`, so you can use test assertion libraries like `github.com/stretchr/testify/assert`. It also provides methods for managing the mock stream that the test harness creates for each test, and the SSE client that the test harness manages through the test service.
-
-Tests will generally start by calling `StartSSEClient` or `StartSSEClientOptions`. They can then control the mock stream with methods such as `SendOnStream` and `BreakStreamConnection`, and declare expectations about what the SSE client should receive with methods such as `RequireEvent`.
-
-Any test of extended capabilities that are not required for every SSE implementation should start by calling `RequireCapability`, causing that test (or group of tests) to be skipped if the test service did not declare that capability.

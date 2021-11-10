@@ -10,31 +10,7 @@ jobs:
   docker-build-and-smoke-test:
     docker:
       - image: cimg/base:2021.10
-
     steps:
       - checkout
-
       - setup_remote_docker
-
-      - run: docker build --tag sse-contract-tests .
-
-      # To verify that the built image actually works, we'll run it against a fake service
-      # that's set up to always return a 500 error. Seeing the expected error message from
-      # the test harness proves that the harness did run and connected to the right URL.
-
-      - run: docker network create shared
-
-      - run:
-          name: start fake service container
-          command: |
-            docker run -d -p 8000:8000 --network shared --name fakeservice cimg/base:2021.10 \
-              bash -c "while true ; do echo -e \"HTTP/1.1 500 Nope\n\n\" | nc -l -p 8000 ; done"
-
-      - run:
-          name: run test harness against fake service
-          command: |
-            (docker run -p 8111:8111 --network shared sse-contract-tests --url http://fakeservice:8000 2>&1 || true) | tee test.log
-
-      - run:
-          name: check for expected error message
-          command: grep "test service returned status code 500" <test.log
+      - run: make docker-smoke-test

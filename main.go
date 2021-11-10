@@ -58,7 +58,7 @@ func main() {
 		fmt.Println()
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to connect to test service: %s\n", err)
+		fmt.Fprintf(os.Stderr, "Test service error: %s\n", err)
 		os.Exit(1)
 	}
 
