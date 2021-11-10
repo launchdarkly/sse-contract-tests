@@ -27,9 +27,8 @@ jobs:
       - run:
           name: start fake service container
           command: |
-            docker run -p 8000:8000 --network shared --name fakeservice cimg/base:2021.10 \
+            docker run -d -p 8000:8000 --network shared --name fakeservice cimg/base:2021.10 \
               bash -c "while true ; do echo -e \"HTTP/1.1 500 Nope\n\n\" | nc -l -p 8000 ; done"
-          background: true
 
       - run:
           name: run test harness against fake service
