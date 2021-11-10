@@ -4,12 +4,12 @@ workflows:
   version: 2
   test:
     jobs:
-    - build
+    - docker-build-and-smoke-test
 
 jobs:
-  build:
+  docker-build-and-smoke-test:
     docker:
-      - image: ubuntu:20-04
+      - image: ubuntu:20.04
 
     steps:
       - checkout
