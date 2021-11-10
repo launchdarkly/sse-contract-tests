@@ -18,10 +18,20 @@ jobs:
 
       - run: docker build --tag sse-contract-tests .
 
+      - run: docker network create shared
+
       - run:
-          command: while true ; do  echo -e "HTTP/1.1 500 Nope\n\n" | nc -l -p 8000  ; done
+          name: start fake service container
+          command: |
+            docker run -p 8000:8000 --network shared --name fakeservice cimg/base:2021.10 \
+              bash -c "while true ; do  echo -e 'HTTP/1.1 500 Nope\n\n' | nc -l -p 8000  ; done"
           background: true
 
-      - run: (docker run -p 8111:8111 sse-contract-tests --url http://localhost:8000 2>&1 || true) | tee test.log
+      - run:
+          name: run test harness against fake service
+          command: |
+            docker run -p 8111:8111 --network shared --url http://fakeservice:8000 2>&1 || true) | tee test.log
 
-      - run: grep "test service returned status code 500" <test.log
+      - run:
+          name: check for expected error message
+          command: grep "test service returned status code 500" <test.log
