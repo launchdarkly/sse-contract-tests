@@ -1,11 +1,9 @@
-package testframework
+package framework
 
 import (
 	"errors"
 	"fmt"
 	"runtime/debug"
-
-	"github.com/launchdarkly/sse-contract-tests/logging"
 )
 
 type Filter func(TestID) bool
@@ -19,7 +17,7 @@ type environment struct {
 type Context struct {
 	env         *environment
 	id          TestID
-	debugLogger logging.CapturingLogger
+	debugLogger CapturingLogger
 	failed      bool
 	skipped     bool
 	skipReason  string
@@ -31,6 +29,9 @@ func Run(
 	testLogger TestLogger,
 	action func(*Context),
 ) Results {
+	if testLogger == nil {
+		testLogger = nullTestLogger{}
+	}
 	env := &environment{
 		filter:     filter,
 		testLogger: testLogger,
@@ -119,6 +120,6 @@ func (c *Context) Debug(message string, args ...interface{}) {
 	c.debugLogger.Printf(message, args...)
 }
 
-func (c *Context) DebugLogger() logging.Logger {
+func (c *Context) DebugLogger() Logger {
 	return &c.debugLogger
 }

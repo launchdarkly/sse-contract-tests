@@ -6,13 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/launchdarkly/sse-contract-tests/logging"
+	"github.com/launchdarkly/sse-contract-tests/framework"
 
 	"gopkg.in/launchdarkly/go-sdk-common.v2/ldvalue"
 )
@@ -25,7 +24,6 @@ const callbackPathPrefix = "/callbacks/"
 type TestServiceClient struct {
 	testServiceBaseURL string
 	callbackBaseURL    string
-	logger             logging.Logger
 	capabilities       []string
 	activeEntities     map[string]*TestServiceEntity
 	lastID             int
@@ -70,35 +68,45 @@ func NewSSETestClient(
 	listenerPort int,
 	externalHostname string,
 	timeout time.Duration,
-	logger *log.Logger,
+	logger framework.Logger,
 ) (*TestServiceClient, error) {
+	if logger == nil {
+		logger = framework.NullLogger()
+	}
+
 	deadline := time.Now().Add(timeout)
 	c := &TestServiceClient{
 		testServiceBaseURL: testServiceBaseURL,
 		callbackBaseURL:    fmt.Sprintf("http://%s:%d", externalHostname, listenerPort),
-		logger:             logger,
 		activeEntities:     make(map[string]*TestServiceEntity),
 	}
+
 WaitLoop:
 	for {
-		logger.Printf("Making request to %s", testServiceBaseURL)
 		resp, err := http.DefaultClient.Get(testServiceBaseURL)
-		if err == nil && resp.StatusCode == 200 {
-			logger.Printf("Got 200 status from %s", testServiceBaseURL)
-			if resp.Body != nil {
-				respData, err := ioutil.ReadAll(resp.Body)
-				resp.Body.Close()
-				if err != nil {
-					return nil, err
+		if err != nil {
+			logger.Printf("Status request failed: %s", err)
+		} else {
+			if resp.StatusCode == 200 {
+				if resp.Body == nil {
+					logger.Printf("Status request successful, but no metadata")
+				} else {
+					respData, err := ioutil.ReadAll(resp.Body)
+					resp.Body.Close()
+					if err != nil {
+						return nil, err
+					}
+					logger.Printf("Status request returned metadata: %s", string(respData))
+					var statusResp clientStatusResponse
+					if err := json.Unmarshal(respData, &statusResp); err != nil {
+						return nil, fmt.Errorf("malformed status response from test service: %s", string(respData))
+					}
+					c.capabilities = statusResp.Capabilities
 				}
-				logger.Printf("Metadata: %s", string(respData))
-				var statusResp clientStatusResponse
-				if err := json.Unmarshal(respData, &statusResp); err != nil {
-					return nil, fmt.Errorf("malformed status response from test service: %s", string(respData))
-				}
-				c.capabilities = statusResp.Capabilities
+				break WaitLoop
+			} else {
+				logger.Printf("Status request returned %d", resp.StatusCode)
 			}
-			break WaitLoop
 		}
 		if !time.Now().Before(deadline) {
 			if err == nil {
@@ -106,7 +114,7 @@ WaitLoop:
 			}
 			return nil, fmt.Errorf("result of last query was: %s", err)
 		}
-		time.Sleep(time.Millisecond * 20)
+		time.Sleep(time.Millisecond * 50)
 	}
 
 	return c, nil
@@ -140,9 +148,9 @@ func (c *TestServiceClient) MissingCapabilities() []string {
 // CreateEntity tells the test service to create a new instance of the kind of entity it
 // manages (in this case an SSE stream client), returning a TestServiceEntity to use for
 // communicating about that instance.
-func (c *TestServiceClient) CreateEntity(opts CreateStreamOpts, logger logging.Logger) (*TestServiceEntity, error) {
+func (c *TestServiceClient) CreateEntity(opts CreateStreamOpts, logger framework.Logger) (*TestServiceEntity, error) {
 	if logger == nil {
-		logger = c.logger
+		logger = framework.NullLogger()
 	}
 
 	c.lock.Lock()

@@ -5,8 +5,9 @@ import (
 	"time"
 
 	"github.com/launchdarkly/sse-contract-tests/client"
-	"github.com/launchdarkly/sse-contract-tests/stream"
-	"github.com/launchdarkly/sse-contract-tests/testframework"
+	"github.com/launchdarkly/sse-contract-tests/framework"
+	"github.com/launchdarkly/sse-contract-tests/mockstream"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +16,7 @@ import (
 //
 // It implements the same basic functionality as Go's testing.T, but in an environment that is outside
 // of the Go test runner, and with some extra features such as debug logging that are convenient for
-// our use case. Those features are provided by our lower-level testframework package.
+// our use case. Those features are provided by our lower-level framework package.
 //
 // It also provides functionality that is specific to SSE testing. Every T instance maintains a mock
 // stream (implemented in our stream package), and a reference to an SSE client in the test service.
@@ -26,15 +27,15 @@ import (
 // causing the test to immediately fail if something unexpected happens, to reduce the amount of
 // boilerplate logic in tests.
 type T struct {
-	context   *testframework.Context
+	context   *framework.Context
 	env       *environment
-	stream    *stream.MockStream
+	stream    *mockstream.MockStream
 	sseClient *client.TestServiceEntity
 }
 
 type environment struct {
 	client        *client.TestServiceClient
-	streamManager *stream.StreamManager
+	streamManager *mockstream.StreamManager
 }
 
 func (t *T) close() {
@@ -63,7 +64,7 @@ func (t *T) FailNow() {
 func (t *T) Run(name string, action func(*T)) {
 	t1 := &T{env: t.env}
 
-	t.context.Run(name, func(c *testframework.Context) {
+	t.context.Run(name, func(c *framework.Context) {
 		t1.context = c
 		t1.stream = t.env.streamManager.NewMockStream(c.DebugLogger())
 		action(t1)
@@ -92,7 +93,7 @@ func (t *T) RequireCapability(capability string) {
 // This also causes the test to wait for the client to connect to the mock stream. It will fail
 // and immediately exit the test if it times out while waiting. It returns information about
 // the incoming connection.
-func (t *T) StartSSEClient() *stream.IncomingConnection {
+func (t *T) StartSSEClient() *mockstream.IncomingConnection {
 	return t.StartSSEClientOptions(client.CreateStreamOpts{})
 }
 
@@ -102,7 +103,7 @@ func (t *T) StartSSEClient() *stream.IncomingConnection {
 // This also causes the test to wait for the client to connect to the mock stream. It will fail
 // and immediately exit the test if it times out while waiting. It returns information about
 // the incoming connection.
-func (t *T) StartSSEClientOptions(opts client.CreateStreamOpts) *stream.IncomingConnection {
+func (t *T) StartSSEClientOptions(opts client.CreateStreamOpts) *mockstream.IncomingConnection {
 	opts.StreamURL = t.stream.URL
 	opts.Tag = t.context.ID().String()
 	sseClient, err := t.env.client.CreateEntity(opts, t.context.DebugLogger())
@@ -121,7 +122,7 @@ func (t *T) StartSSEClientOptions(opts client.CreateStreamOpts) *stream.Incoming
 // the incoming connection.
 //
 // Tests only need to call this method if they expect another connection after the first one.
-func (t *T) AwaitNewConnectionToStream() *stream.IncomingConnection {
+func (t *T) AwaitNewConnectionToStream() *mockstream.IncomingConnection {
 	cxn, err := t.stream.AwaitConnection()
 	require.NoError(t, err)
 

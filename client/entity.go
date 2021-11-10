@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/launchdarkly/sse-contract-tests/logging"
+	"github.com/launchdarkly/sse-contract-tests/framework"
 )
 
 const defaultAwaitTimeout = time.Second * 5
@@ -24,7 +24,7 @@ type TestServiceEntity struct {
 	owner   *TestServiceClient
 	id      string
 	url     string
-	logger  logging.Logger
+	logger  framework.Logger
 	timeout time.Duration
 	output  chan entityOutput
 	lock    sync.Mutex
@@ -73,7 +73,7 @@ type commandRequestParams struct {
 	Command string `json:"command"`
 }
 
-func newTestServiceEntity(owner *TestServiceClient, id string, logger logging.Logger) *TestServiceEntity {
+func newTestServiceEntity(owner *TestServiceClient, id string, logger framework.Logger) *TestServiceEntity {
 	return &TestServiceEntity{
 		owner:   owner,
 		id:      id,

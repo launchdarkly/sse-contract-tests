@@ -1,4 +1,4 @@
-package stream
+package mockstream
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/launchdarkly/sse-contract-tests/logging"
+	"github.com/launchdarkly/sse-contract-tests/framework"
 )
 
 const defaultAwaitConnectionTimeout = time.Second * 5
@@ -28,7 +28,7 @@ func NewStreamManager(host string, port int) *StreamManager {
 	}
 }
 
-func (s *StreamManager) NewMockStream(logger logging.Logger) *MockStream {
+func (s *StreamManager) NewMockStream(logger framework.Logger) *MockStream {
 	s.lastID++
 	endpointID := strconv.Itoa(s.lastID)
 

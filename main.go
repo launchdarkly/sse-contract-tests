@@ -3,17 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/launchdarkly/sse-contract-tests/client"
+	"github.com/launchdarkly/sse-contract-tests/framework"
+	"github.com/launchdarkly/sse-contract-tests/mockstream"
 	"github.com/launchdarkly/sse-contract-tests/ssetests"
-	"github.com/launchdarkly/sse-contract-tests/stream"
-	"github.com/launchdarkly/sse-contract-tests/testframework"
 )
 
 const defaultPort = 8111
@@ -28,7 +26,6 @@ func main() {
 	var debugAll bool
 
 	fs := flag.NewFlagSet("", flag.ExitOnError)
-
 	fs.StringVar(&serviceURL, "url", "", "test service URL")
 	fs.StringVar(&host, "host", "localhost", "external hostname of the test harness")
 	fs.IntVar(&port, "port", defaultPort, "port that the test harness will listen on")
@@ -42,21 +39,24 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Invalid parameters: %s\n", err)
 		os.Exit(1)
 	}
-
-	var debugLogger *log.Logger
-	if debug {
-		debugLogger = log.New(os.Stderr, "", log.Ldate|log.Ltime|log.Lmicroseconds)
-	} else {
-		debugLogger = log.New(ioutil.Discard, "", 0)
+	if serviceURL == "" {
+		fmt.Fprintln(os.Stderr, "--url is required")
+		os.Exit(1)
 	}
 
+	fmt.Printf("Connecting to test service at %s\n\n", serviceURL)
+	var clientLogger framework.CapturingLogger
 	client, err := client.NewSSETestClient(
 		serviceURL,
 		port,
 		host,
 		time.Second*5,
-		debugLogger,
+		&clientLogger,
 	)
+	if debugAll || (debug && err != nil) {
+		clientLogger.Output().Dump(os.Stdout, "")
+		fmt.Println()
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to test service: %s\n", err)
 		os.Exit(1)
@@ -80,11 +80,11 @@ func main() {
 		fmt.Println()
 	}
 
-	streamManager := stream.NewStreamManager(host, port)
+	streamManager := mockstream.NewStreamManager(host, port)
 
 	startServer(port, client, streamManager)
 
-	filter := func(id testframework.TestID) bool {
+	filter := func(id framework.TestID) bool {
 		name := id.String()
 		return (!runFilter.IsDefined() || runFilter.AnyMatch(name)) &&
 			!skipFilter.AnyMatch(name)
@@ -108,7 +108,7 @@ func main() {
 	fmt.Println("All tests passed")
 }
 
-func startServer(port int, client *client.TestServiceClient, streamManager *stream.StreamManager) {
+func startServer(port int, client *client.TestServiceClient, streamManager *mockstream.StreamManager) {
 	server := &http.Server{
 		Addr: fmt.Sprintf(":%d", port),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

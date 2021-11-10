@@ -1,4 +1,4 @@
-package stream
+package mockstream
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/launchdarkly/sse-contract-tests/logging"
+	"github.com/launchdarkly/sse-contract-tests/framework"
 )
 
 // MockStream is a simulation of an SSE server that is instrumented for tests. Each test in the
@@ -27,7 +27,7 @@ type MockStream struct {
 	id        string
 	URL       string
 	Errors    chan error
-	logger    logging.Logger
+	logger    framework.Logger
 	active    bool
 	cxnCh     chan *IncomingConnection
 	activeCxn *IncomingConnection

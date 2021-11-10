@@ -2,17 +2,17 @@ package ssetests
 
 import (
 	"github.com/launchdarkly/sse-contract-tests/client"
-	"github.com/launchdarkly/sse-contract-tests/stream"
-	"github.com/launchdarkly/sse-contract-tests/testframework"
+	"github.com/launchdarkly/sse-contract-tests/framework"
+	"github.com/launchdarkly/sse-contract-tests/mockstream"
 )
 
 func RunTestSuite(
 	client *client.TestServiceClient,
-	streamManager *stream.StreamManager,
-	filter testframework.Filter,
-	testLogger testframework.TestLogger,
-) testframework.Results {
-	return testframework.Run(filter, testLogger, func(c *testframework.Context) {
+	streamManager *mockstream.StreamManager,
+	filter framework.Filter,
+	testLogger framework.TestLogger,
+) framework.Results {
+	return framework.Run(filter, testLogger, func(c *framework.Context) {
 		t := &T{
 			context: c,
 			env: &environment{
