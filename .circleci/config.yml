@@ -30,7 +30,7 @@ jobs:
       - run:
           name: run test harness against fake service
           command: |
-            (docker run -p 8111:8111 --network shared --url http://fakeservice:8000 2>&1 || true) | tee test.log
+            (docker run -p 8111:8111 --network shared sse-contract-tests --url http://fakeservice:8000 2>&1 || true) | tee test.log
 
       - run:
           name: check for expected error message
