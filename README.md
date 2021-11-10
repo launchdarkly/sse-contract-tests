@@ -10,11 +10,18 @@ To use this tool, you must first implement a small web service that exercises th
 
 ```shell
 ./sse-contract-tests --url <test service base URL> [other options]
-
-# other options:
-#   --port <PORT>  sets the callback port that test services will connect to (default: 8111)
-#   --debug        enables verbose logging of test status
 ```
+
+Options besides `--url`:
+
+* `--host <NAME>` - sets the hostname to use in callback URLs, if not the same as the host the test service is running on (default: localhost)
+* `--port <PORT>` - sets the callback port that test services will connect to (default: 8111)
+* `--run <REGEX>` - skips any tests whose names do not match the specified regex (can specify more than one)
+* `--skip <REGEX>` - skips any tests whose names match the specified regex (can specify more than one)
+* `--debug` - enables verbose logging of test actions for failed tests
+* `--debug-all` - enables verbose logging of test actions for all tests
+
+For `--run` and `--skip`, the name of a test is the string that appears between brackets in the test output. This may have multiple segments delimited by slashes, such as `name of test category/name of subtest`.
 
 ## Test service endpoints
 
@@ -24,20 +31,21 @@ This resource should return a 200 status to indicate that the service has starte
 
 * `capabilities`: An array of strings describing optional features that this SSE implementation supports:
   * `"comments"`: The SSE client allows the caller to read comment lines. All SSE implementations must be able to handle comment lines, but many of them will simply discard the comments and not allow them to be seen.
-  * `"cr-only"`: The SSE client is able to recognize a single CR (0x0D) as a line terminator. The SSE spec allows CR, LF, or CRLF, but some implementations are not fully compliant and only allow LF and CRLF.
   * `"headers"`: The SSE client can be configured to send custom headers.
   * `"last-event-id"`: The SSE client can be configured to send a specific `Last-Event-Id` value in its initial HTTP request.
   * `"post"`: The SSE client can be configured to send a `POST` request with a body instead of a `GET`.
   * `"read-timeout"`: The SSE client can be configured with a specific read timeout (a.k.a. socket timeout).
   * `"report"`: The SSE client can be configured to send a `REPORT` request with a body instead of a `GET`.
+  * `"restart"`: The caller can tell the SSE client at any time to disconnect and retry.
 
 The test harness will use the `capabilities` information to decide whether to run optional parts of the test suite that relate to those capabilities.
 
-### Stream resource: `POST /`
+### Create stream: `POST /`
 
-A `POST` request indicates that the test harness wants to start an instance of the SSE client. The request body is a JSON object with the following properties. All of the properties except `url` are optional.
+A `POST` request indicates that the test harness wants to start an instance of the SSE client. The request body is a JSON object with the following properties. All of the properties except `streamUrl` and `callbackUrl` are optional.
 
-* `url`: The URL of an SSE endpoint created by the test harness.
+* `streamUrl`: The URL of an SSE endpoint created by the test harness.
+* `callbackUrl`: The URL of a callback endpoint created by the test harness (see "Callback endpoint" below).
 * `tag`: A string describing the current test, if desired for logging.
 * `initialDelayMs`: An optional integer specifying the initial reconnection delay parameter, in milliseconds. Not all SSE client implementations allow this to be configured, but the test harness will send a value anyway in an attempt to avoid having reconnection tests run unnecessarily slowly.
 * `lastEventId`: An optional string which should be sent as the `Last-Event-Id` header in the initial HTTP request. The test harness will only set this property if the test service has the `"last-event-id"` capability.
@@ -45,13 +53,33 @@ A `POST` request indicates that the test harness wants to start an instance of t
 * `method`: A string specifying an HTTP method to use instead of `GET`. The test harness will only set this property if the test service has the `"post"` or `"report"` capability.
 * `body`: A string specifying data to be sent in the HTTP request body. The test harness will only set this property if the test service has the `"post"` or `"report"` capability.
 
-The response to this request is a streaming response using chunked transfer encoding. This is not an SSE stream, since then the test suite would have to rely on a specific SSE implementation to verify a different SSE implementation. Instead, it uses a simpler format where each "message" is a JSON object followed by a single LF (`\n`). The JSON object itself cannot contain any unescaped LF characters.
+The response to a valid request is any HTTP `2xx` status, with a `Location` header whose value is the URL of the test service resource representing this instance (that is, the one that would be used for "Close stream" or "Send command" as described below).
 
-The JSON message can be one of the following:
+If any parameters are invalid, return HTTP `400`.
+
+### Send command: `POST <URL of stream instance>`
+
+A `POST` request to the resource that was returned by "Create stream" means the test harness wants to do something to an existing SSE client instance. The request body is a JSON object with the following property:
+
+* `command`: Currently the only supported value is `"restart"`, meaning the stream should be disconnected and reconnected with the same stream URL. This will only be sent if the test service has the `"restart"` capability.
+
+Return any HTTP `2xx` status, or `400` for an unrecognized command.
+
+If the SSE implementation does not support any special commands, then the test service doesn't need to implement this endpoint.
+
+### Close stream: `DELETE <URL of stream instance>`
+
+A `DELETE` request to the resource that was returned by "Create stream" means the test harness is done with this SSE client instance and the test service should stop it.
+
+Return any HTTP `2xx` status.
+
+## Callback endpoint
+
+When the test harness tells the test service to create a stream, it provides a callback URL that is specific to that stream. The test service should make `POST` requests to this URL to deliver information about the status of the stream. The request body is always a JSON object, which can be one of the following:
 
 #### `hello` message
 
-The test service must send this message first in each response. This just tells the test harness that the stream is being created, regardless of whether it succeeds or fails.
+The test service must send this message first when it has been told to create a stream. This just tells the test harness that the stream is being created, regardless of whether it succeeds or fails.
 
 ```json
 { "kind": "hello" }
@@ -93,3 +121,13 @@ This message indicates that the test service has received an error from the SSE 
   "comment": "the error message"
 }
 ```
+
+## Writing tests
+
+The test suite is written in Go code, in the `ssetests` package.
+
+It does not use the Go test runner, but the API is deliberately similar to Go's `testing` package. The `ssetests.T` type implements the same basic methods as `testing.T`, so you can use test assertion libraries like `github.com/stretchr/testify/assert`. It also provides methods for managing the mock stream that the test harness creates for each test, and the SSE client that the test harness manages through the test service.
+
+Tests will generally start by calling `StartSSEClient` or `StartSSEClientOptions`. They can then control the mock stream with methods such as `Send` and `BreakStreamConnection`, and declare expectations about what the SSE client should receive with methods such as `RequireEvent`.
+
+Any test of extended capabilities that are not required for every SSE implementation should start by calling `RequireCapability`, causing that test (or group of tests) to be skipped if the test service did not declare that capability.

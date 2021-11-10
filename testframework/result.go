@@ -1,11 +1,11 @@
-package testsuite
+package testframework
 
 import (
 	"fmt"
 	"strings"
 )
 
-type Result struct {
+type Results struct {
 	Tests    []TestResult
 	Failures []TestResult
 }
@@ -16,7 +16,7 @@ type TestResult struct {
 	Skipped bool
 }
 
-func (r Result) OK() bool {
+func (r Results) OK() bool {
 	return len(r.Failures) == 0
 }
 

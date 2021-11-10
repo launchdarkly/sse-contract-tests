@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/launchdarkly/sse-contract-tests/client"
+	"github.com/launchdarkly/sse-contract-tests/ssetests"
 	"github.com/launchdarkly/sse-contract-tests/stream"
-	"github.com/launchdarkly/sse-contract-tests/testsuite"
+	"github.com/launchdarkly/sse-contract-tests/testframework"
 )
 
 const defaultPort = 8111
@@ -20,14 +22,20 @@ func main() {
 	var serviceURL string
 	var port int
 	var host string
+	var runFilter Filter
+	var skipFilter Filter
 	var debug bool
+	var debugAll bool
 
 	fs := flag.NewFlagSet("", flag.ExitOnError)
 
 	fs.StringVar(&serviceURL, "url", "", "test service URL")
-	fs.BoolVar(&debug, "debug", false, "enable debug logging")
 	fs.StringVar(&host, "host", "localhost", "external hostname of the test harness")
 	fs.IntVar(&port, "port", defaultPort, "port that the test harness will listen on")
+	fs.Var(&runFilter, "run", "regex pattern(s) to select tests to run")
+	fs.Var(&skipFilter, "skip", "regex pattern(s) to select tests not to run")
+	fs.BoolVar(&debug, "debug", false, "enable debug logging for failed tests")
+	fs.BoolVar(&debugAll, "debug-all", false, "enable debug logging for all tests")
 
 	err := fs.Parse(os.Args[1:])
 	if err != nil {
@@ -42,7 +50,13 @@ func main() {
 		debugLogger = log.New(ioutil.Discard, "", 0)
 	}
 
-	client, err := client.NewSSETestClient(serviceURL, time.Second*5, debugLogger)
+	client, err := client.NewSSETestClient(
+		serviceURL,
+		port,
+		host,
+		time.Second*5,
+		debugLogger,
+	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to test service: %s\n", err)
 		os.Exit(1)
@@ -55,13 +69,82 @@ func main() {
 		fmt.Println()
 	}
 
-	server := stream.NewServer(host, port)
+	if runFilter.IsDefined() || skipFilter.IsDefined() {
+		fmt.Println("Some tests will be skipped based on the filter criteria for this test run:")
+		if runFilter.IsDefined() {
+			fmt.Printf("  skip any not matching %s\n", runFilter)
+		}
+		if skipFilter.IsDefined() {
+			fmt.Printf("  skip any matching %s\n", skipFilter)
+		}
+		fmt.Println()
+	}
+
+	streamManager := stream.NewStreamManager(host, port)
+
+	startServer(port, client, streamManager)
+
+	filter := func(id testframework.TestID) bool {
+		name := id.String()
+		return (!runFilter.IsDefined() || runFilter.AnyMatch(name)) &&
+			!skipFilter.AnyMatch(name)
+	}
 
 	fmt.Println("Running test suite")
-	result := testsuite.RunTestSuite(client, server, &ConsoleTestLogger{}, debugLogger)
-	if !result.OK() {
-		fmt.Fprintf(os.Stderr, "%d failed tests\n", len(result.Failures))
+	testLogger := ConsoleTestLogger{
+		DebugOutputOnFailure: debug || debugAll,
+		DebugOutputOnSuccess: debugAll,
+	}
+	results := ssetests.RunTestSuite(client, streamManager, filter, &testLogger)
+	if !results.OK() {
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintf(os.Stderr, "FAILED TESTS (%d):\n", len(results.Failures))
+		for _, f := range results.Failures {
+			fmt.Fprintf(os.Stderr, "  * %s\n", f.TestID)
+		}
 		os.Exit(1)
 	}
+	fmt.Println()
 	fmt.Println("All tests passed")
+}
+
+func startServer(port int, client *client.TestServiceClient, streamManager *stream.StreamManager) {
+	server := &http.Server{
+		Addr: fmt.Sprintf(":%d", port),
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == "HEAD" {
+				w.WriteHeader(200)
+				return
+			}
+			if client.HandleRequest(w, r) {
+				return
+			}
+			if streamManager.HandleRequest(w, r) {
+				return
+			}
+			w.WriteHeader(http.StatusNotFound)
+		}),
+	}
+	go func() {
+		if err := server.ListenAndServe(); err != nil {
+			panic(err)
+		}
+	}()
+
+	// Wait till the server is definitely listening for requests before we run any tests
+	deadline := time.NewTimer(time.Second * 10)
+	defer deadline.Stop()
+	ticker := time.NewTicker(time.Millisecond * 10)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-deadline.C:
+			panic("Could not detect own listener at " + server.Addr)
+		case <-ticker.C:
+			resp, err := http.DefaultClient.Head(fmt.Sprintf("http://localhost:%d", port))
+			if err == nil && resp.StatusCode == 200 {
+				return
+			}
+		}
+	}
 }

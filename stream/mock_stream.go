@@ -5,13 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/launchdarkly/sse-contract-tests/logging"
 )
 
-// Endpoint is a simulation of an SSE server that is instrumented for tests. Each test in the
+// MockStream is a simulation of an SSE server that is instrumented for tests. Each test in the
 // test suite will construct one of these and then tell the test service to connect to it. The
 // server only allows one active connection and will signal an error if there is ever more than
 // one at a time (since SSE clients should not attempt to reconnect unless the connection has
@@ -20,12 +22,12 @@ import (
 // Endpoint does not have any of the usual pub/sub or event formatting logic that would exist
 // in a real SSE server. The test suites will simply push chunks of raw data through it to the
 // client.
-type Endpoint struct {
-	owner     *Server
+type MockStream struct {
+	owner     *StreamManager
 	id        string
 	URL       string
 	Errors    chan error
-	logger    *log.Logger
+	logger    logging.Logger
 	active    bool
 	cxnCh     chan *IncomingConnection
 	activeCxn *IncomingConnection
@@ -46,14 +48,14 @@ type chunk struct {
 }
 
 // AwaitConnection waits until the test service has connected to the server.
-func (e *Endpoint) AwaitConnection() (*IncomingConnection, error) {
+func (m *MockStream) AwaitConnection() (*IncomingConnection, error) {
 	deadline := time.NewTimer(defaultAwaitConnectionTimeout)
 	defer deadline.Stop()
 	select {
-	case cxn := <-e.cxnCh:
-		e.activeCxn = cxn
+	case cxn := <-m.cxnCh:
+		m.activeCxn = cxn
 		return cxn, nil
-	case err := <-e.Errors:
+	case err := <-m.Errors:
 		return nil, err
 	case <-deadline.C:
 		return nil, errors.New("timed out waiting for test service to make a stream connection")
@@ -61,23 +63,23 @@ func (e *Endpoint) AwaitConnection() (*IncomingConnection, error) {
 }
 
 // SendChunk sends a chunk of data on the stream and flushes the stream.
-func (e *Endpoint) SendChunk(data string) {
-	e.SendChunkThenWait(data, 0)
+func (m *MockStream) SendChunk(data string) {
+	m.SendChunkThenWait(data, 0)
 }
 
 // SendChunkThenWait sends a chunk of data, flushes it, and then sleeps for an interval.
-func (e *Endpoint) SendChunkThenWait(data string, delay time.Duration) {
-	if e.activeCxn == nil {
-		return
+func (m *MockStream) SendChunkThenWait(data string, delay time.Duration) {
+	if m.activeCxn == nil {
+		panic("tried to send data on the stream before we got a connection")
 	}
-	e.activeCxn.data <- chunk{data: []byte(data), delayAfter: delay}
+	m.activeCxn.data <- chunk{data: []byte(data), delayAfter: delay}
 }
 
 // SendSplit breaks a string into multiple chunks of the specified byte length, and then sends
 // and flushes each, with an optional delay in between.
-func (e *Endpoint) SendSplit(data string, chunkSize int, delayBetween time.Duration) {
-	if e.activeCxn == nil {
-		return
+func (m *MockStream) SendSplit(data string, chunkSize int, delayBetween time.Duration) {
+	if m.activeCxn == nil {
+		panic("tried to send data on the stream before we got a connection")
 	}
 	bytes := []byte(data)
 	for pos := 0; pos < len(bytes); pos += chunkSize {
@@ -89,33 +91,39 @@ func (e *Endpoint) SendSplit(data string, chunkSize int, delayBetween time.Durat
 		if max < len(bytes) {
 			chunk.delayAfter = delayBetween
 		}
-		e.activeCxn.data <- chunk
+		m.activeCxn.data <- chunk
 	}
 }
 
 // Close permanently removes the endpoint.
-func (e *Endpoint) Close() {
-	delete(e.owner.endpoints, e.id)
-	e.Interrupt()
+func (m *MockStream) Close() {
+	m.owner.forgetStream(m.id)
+	m.Interrupt()
 }
 
 // Interrupt closes the current connection.
-func (e *Endpoint) Interrupt() {
-	if e.activeCxn != nil {
-		close(e.activeCxn.data)
-		e.activeCxn = nil
+func (m *MockStream) Interrupt() {
+	if m.activeCxn != nil {
+		m.logger.Printf("Deliberately breaking stream connection")
+		close(m.activeCxn.data)
+		m.activeCxn = nil
 	}
 }
 
-func (e *Endpoint) serveHTTP(w http.ResponseWriter, req *http.Request) {
-	e.lock.Lock()
-	if e.active {
-		e.lock.Unlock()
-		e.Errors <- errors.New("unexpectedly received a connection while the previous connection was still open")
+func (m *MockStream) serveHTTP(w http.ResponseWriter, req *http.Request) {
+	m.logger.Printf("Got connection from SSE client; headers follow")
+	for k, v := range req.Header {
+		m.logger.Printf("  %s: %s", k, strings.Join(v, ", "))
+	}
+
+	m.lock.Lock()
+	if m.active {
+		m.lock.Unlock()
+		m.Errors <- errors.New("unexpectedly received a connection while the previous connection was still open")
 		return
 	}
-	e.active = true
-	e.lock.Unlock()
+	m.active = true
+	m.lock.Unlock()
 
 	closeNotifyCh := req.Context().Done()
 
@@ -124,19 +132,19 @@ func (e *Endpoint) serveHTTP(w http.ResponseWriter, req *http.Request) {
 		data, err := ioutil.ReadAll(req.Body)
 		req.Body.Close()
 		if err != nil {
-			e.Errors <- fmt.Errorf("error trying to read request body: %s", err)
+			m.Errors <- fmt.Errorf("error trying to read request body: %s", err)
 			return
 		}
 		body = data
 	}
-	dataCh := make(chan chunk)
+	dataCh := make(chan chunk, 100)
 	cxn := &IncomingConnection{
 		headers: req.Header,
 		data:    dataCh,
 		method:  req.Method,
 		body:    body,
 	}
-	e.cxnCh <- cxn
+	m.cxnCh <- cxn
 
 	flusher := w.(http.Flusher)
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
@@ -152,10 +160,10 @@ Loop:
 			}
 			chunkStr := string(chunk.data)
 			jsonStr, _ := json.Marshal(chunkStr)
-			e.logger.Printf("sending: %s", jsonStr)
+			m.logger.Printf("<< sending: %s", jsonStr)
 			_, err := w.Write(chunk.data)
 			if err != nil {
-				e.Errors <- err
+				m.Errors <- err
 				break Loop
 			}
 			flusher.Flush()
@@ -167,9 +175,9 @@ Loop:
 		}
 	}
 
-	e.lock.Lock()
-	e.active = false
-	e.lock.Unlock()
+	m.lock.Lock()
+	m.active = false
+	m.lock.Unlock()
 }
 
 func (c *IncomingConnection) Headers() http.Header {
