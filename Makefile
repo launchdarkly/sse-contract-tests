@@ -39,7 +39,7 @@ docker-push: docker-build
 	docker push $(DOCKER_IMAGE_TAG_MAJOR)
 	docker push $(DOCKER_IMAGE_TAG_MINOR)
 
-docker-smoke-test: build
+docker-smoke-test: docker-build
 	@# To verify that the built image actually works, we'll run it against a fake service
 	@# that's set up to always return a 500 error. Seeing the expected error message from
 	@# the test harness proves that the harness did run and connected to the right URL.
