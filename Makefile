@@ -11,11 +11,10 @@ GOLANGCI_LINT_VERSION=v1.27.0
 LINTER=./bin/golangci-lint
 LINTER_VERSION_FILE=./bin/.golangci-lint-version-$(GOLANGCI_LINT_VERSION)
 
-.PHONY: build clean lint docker-push docker-smoke-test
+.PHONY: build clean lint docker-build docker-push docker-smoke-test
 
 build:
 	go build ./...
-	docker build --tag $(DOCKER_IMAGE_TAG_FULL) .
 
 clean:
 	go clean
@@ -29,11 +28,16 @@ $(LINTER_VERSION_FILE):
 lint: $(LINTER_VERSION_FILE)
 	$(LINTER) run ./...
 
-docker-push: build
+docker-build:
+	docker build --tag $(DOCKER_IMAGE_TAG_FULL) .
 	docker tag $(DOCKER_IMAGE_TAG_FULL) $(DOCKER_IMAGE_TAG_MAJOR)
+	docker tag $(DOCKER_IMAGE_TAG_FULL) $(DOCKER_IMAGE_TAG_MINOR)
+
+docker-push: docker-build
 	docker login
 	docker push $(DOCKER_IMAGE_TAG_FULL)
 	docker push $(DOCKER_IMAGE_TAG_MAJOR)
+	docker push $(DOCKER_IMAGE_TAG_MINOR)
 
 docker-smoke-test: build
 	@# To verify that the built image actually works, we'll run it against a fake service

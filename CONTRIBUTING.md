@@ -11,14 +11,19 @@ We encourage pull requests and other contributions from the community. Before su
 ## Build instructions
  
 ### Prerequisites
- 
-This project should be built against Go 1.14 or newer. You must also have Docker installed.
+
+This project should be built against Go 1.14 or newer.
 
 ### Building
 
-To build the project, including building the Docker image:
+To build the project:
 ```
 make
+```
+
+To build the Docker image:
+```
+make docker-build
 ```
 
 To run the linter:
