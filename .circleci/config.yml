@@ -9,7 +9,7 @@ workflows:
 jobs:
   docker-build-and-smoke-test:
     docker:
-      - image: ubuntu:20.04
+      - image: cimg/base:2021.10
 
     steps:
       - checkout
