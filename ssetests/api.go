@@ -199,7 +199,7 @@ func (t *T) RequireMessage() ReceivedMessage {
 
 func (t *T) requireMessageOfKind(kind string) ReceivedMessage {
 	m := t.RequireMessage()
-	if m.Kind != "event" {
+	if m.Kind != kind {
 		require.Fail(t, "received an unexpected message", "expected %q but got: %s", kind, m)
 	}
 	return m
