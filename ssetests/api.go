@@ -218,7 +218,7 @@ func (t *T) RequireEvent() EventMessage {
 // The test fails and immediately exits if it times out without receiving anything, or if what we
 // receive from the test service us is not an error.
 func (t *T) RequireError() string {
-	return t.requireMessageOfKind("event").Error
+	return t.requireMessageOfKind("error").Error
 }
 
 // RequireSpecificEvents waits for the SSE client in the test service to tell us that it received
