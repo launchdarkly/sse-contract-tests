@@ -97,14 +97,6 @@ Return any HTTP `2xx` status, or `404` if there is no such stream.
 
 When the test harness tells the test service to create a stream, it provides a callback URL that is specific to that stream. The test service should make `POST` requests to this URL to deliver information about the status of the stream. The request body is always a JSON object, which can be one of the following:
 
-#### `hello` message
-
-The test service must send this message first when it has been told to create a stream. This just tells the test harness that the stream is being created, regardless of whether it succeeds or fails.
-
-```json
-{ "kind": "hello" }
-```
-
 #### `event` message
 
 This message indicates that the test service has received an event from the SSE stream. The `type`, `data`, and `id` fields correspond to the fields of an SSE event. All but `data` are optional.

@@ -149,10 +149,6 @@ func (t *T) StartSSEClientOptions(opts CreateStreamOpts) framework.IncomingReque
 	require.NoError(t, err)
 	t.sseClientEntity = sseClient
 
-	m, err := t.callbackReceiver.AwaitMessage(awaitMessageTimeout)
-	require.NoError(t, err)
-	require.Equal(t, "hello", m.Kind, `test service did not send the expected "hello" message`)
-
 	return t.AwaitNewConnectionToStream()
 }
 
