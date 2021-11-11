@@ -197,28 +197,28 @@ func (t *T) RequireMessage() ReceivedMessage {
 	return m
 }
 
+func (t *T) requireMessageOfKind(kind string) ReceivedMessage {
+	m := t.RequireMessage()
+	if m.Kind != "event" {
+		require.Fail(t, "received an unexpected message", "expected %q but got: %s", kind, m)
+	}
+	return m
+}
+
 // RequireEvent waits for the SSE client in the test service to tell us that it received an event.
 //
 // The test fails and immediately exits if it times out without receiving anything, or if what we
 // receive from the test service us is not an event.
 func (t *T) RequireEvent() EventMessage {
-	m := t.RequireMessage()
-	if m.Kind != "event" {
-		require.Fail(t, "expected an event but got: %s", m.Kind)
-	}
-	return *m.Event
+	return *(t.requireMessageOfKind("event").Event)
 }
 
-// RequireEvent waits for the SSE client in the test service to tell us that it received an error.
+// RequireError waits for the SSE client in the test service to tell us that it received an error.
 //
 // The test fails and immediately exits if it times out without receiving anything, or if what we
 // receive from the test service us is not an error.
 func (t *T) RequireError() string {
-	m := t.RequireMessage()
-	if m.Kind != "error" {
-		require.Fail(t, "expected an error but got: %s", m.Kind)
-	}
-	return m.Error
+	return t.requireMessageOfKind("event").Error
 }
 
 // RequireSpecificEvents waits for the SSE client in the test service to tell us that it received
@@ -246,12 +246,7 @@ func (t *T) RequireSpecificEvents(events ...EventMessage) {
 // The test fails and immediately exits if it times out without receiving anything, or if what we
 // receive from the test service us is not a comment.
 func (t *T) RequireComment() string {
-	t.requireSSEClientStarted()
-	m := t.RequireMessage()
-	if m.Kind != "comment" {
-		require.Fail(t, "expected a comment but got: %s", m.Kind)
-	}
-	return m.Comment
+	return t.requireMessageOfKind("comment").Comment
 }
 
 // RestartClient tells the SSE client in the test service to immediately disconnect and retry.
