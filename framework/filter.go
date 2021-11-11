@@ -20,13 +20,11 @@ func (r RegexFilters) AsFilter(id TestID) bool {
 		!r.MustNotMatch.AnyMatch(name)
 }
 
-type RegexList struct {
-	patterns []*regexp.Regexp
-}
+type RegexList []*regexp.Regexp
 
 func (r RegexList) String() string {
 	var ss []string
-	for _, p := range r.patterns {
+	for _, p := range r {
 		ss = append(ss, `"`+p.String()+`"`)
 	}
 	return strings.Join(ss, " or ")
@@ -38,16 +36,16 @@ func (r *RegexList) Set(value string) error {
 	if err != nil {
 		return fmt.Errorf("invalid regex: %w", err)
 	}
-	r.patterns = append(r.patterns, rx)
+	*r = append(*r, rx)
 	return nil
 }
 
 func (r RegexList) IsDefined() bool {
-	return len(r.patterns) != 0
+	return len(r) != 0
 }
 
 func (r RegexList) AnyMatch(s string) bool {
-	for _, p := range r.patterns {
+	for _, p := range r {
 		if p.MatchString(s) {
 			return true
 		}

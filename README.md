@@ -27,30 +27,21 @@ For `--run` and `--skip`, the name of a test is the string that appears between 
 
 In a CI job for an SSE implementation, the most convenient way to run the test suite is with Docker. The executable test harness is published as the Docker image `ldcircleci/sse-contract-tests:1`. This major version number will be updated if there is ever a non-backward-compatible change.
 
-Here's an example CircleCI fragment. It assumes that there is a Dockerfile in the current directory that will build and run the test service, listening on port 8000. It runs the service in one container, then runs the test harness in another container (note that you need to use `setup_remote_docker` so that the two containers can see each other across a shared network). At the end, it echoes the console output that was produced by the test service, in case that's helpful in diagnosing an error.
+Since the test harness and the test service need to be able to make requests to each other, you will either need to use host networking or create a Docker bridge network. The latter is the only way to do it in CircleCI (you will also need to use `setup_remote_docker` to enable this in CircleCI).
 
-```yaml
-      - setup_remote_docker
+Because the steps for doing this are basically always the same except for the initial step of building the test service, the tool can provide a script for running itself. It works like this:
 
-      - run: docker build --tag testserviceimage .
+First, build the Docker image for your test service. It should be configured to run the service as soon as the container is started.
 
-      - run: docker network create shared
+Then, run this command, where `<SERVICENAME>` is the name of the Docker image you just built, `<SERVICEPORT>` is the port it will listen on, and `<OTHER_TEST_PARAMS>` are any other command-line parameters you want to pass to the test tool:
 
-      - run:
-          name: run test service
-          command: docker run -d -p 8000:8000 --network shared --name testservice testserviceimage >service.log
-
-      - run:
-          name: run test harness
-          command: |
-            docker run -p 8111:8111 --network shared --name testharness ldcircleci/sse-contract-tests:1 \
-              --url http://testservice:8000 --host testharness
-      
-      - run:
-          name: show test service output
-          when: always
-          command: cat service.log
 ```
+docker run ldcircleci/sse-contract-tests:1 \
+  --url http://<SERVICENAME>:<SERVICEPORT> <OTHER_TEST_PARAMS> \
+  --output-docker-script 1
+```
+
+The output of this command is a script which, if piped back into the shell (`| bash`), will take care of setting up the shared network, starting the test service container, running the test harness container, and cleaning up afterward. It will also dump the log output of the test service container if any tests failed.
 
 ## Test service endpoints
 
