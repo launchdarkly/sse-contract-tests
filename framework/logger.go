@@ -2,7 +2,6 @@ package framework
 
 import (
 	"fmt"
-	"io"
 	"sync"
 	"time"
 )
@@ -44,12 +43,30 @@ func (l *CapturingLogger) Output() CapturedOutput {
 	return ret
 }
 
-func (output CapturedOutput) Dump(dest io.Writer, prefix string) {
+func (output CapturedOutput) ToString(prefix string) string {
+	ret := ""
 	for _, m := range output {
-		fmt.Fprintf(dest, "%s[%s] %s\n",
+		if ret != "" {
+			ret += "\n"
+		}
+		ret += fmt.Sprintf("%s[%s] %s",
 			prefix,
 			m.Time.Format(timestampFormat),
 			m.Message,
 		)
 	}
+	return ret
+}
+
+type prefixedLogger struct {
+	base   Logger
+	prefix string
+}
+
+func LoggerWithPrefix(baseLogger Logger, prefix string) Logger {
+	return prefixedLogger{baseLogger, prefix}
+}
+
+func (p prefixedLogger) Printf(message string, args ...interface{}) {
+	p.base.Printf(p.prefix+message, args...)
 }

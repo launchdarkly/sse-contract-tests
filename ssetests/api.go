@@ -4,13 +4,40 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/launchdarkly/sse-contract-tests/client"
 	"github.com/launchdarkly/sse-contract-tests/framework"
-	"github.com/launchdarkly/sse-contract-tests/mockstream"
+	"gopkg.in/launchdarkly/go-sdk-common.v2/ldvalue"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+const awaitConnectionTimeout = time.Second * 5
+const awaitMessageTimeout = time.Second * 5
+
+var AllCapabilities = []string{
+	"comments",
+	"headers",
+	"last-event-id",
+	"post",
+	"read-timeout",
+	"report",
+}
+
+type CreateStreamOpts struct {
+	InitialDelayMS ldvalue.OptionalInt `json:"initialDelayMs,omitempty"`
+	LastEventID    string              `json:"lastEventId,omitempty"`
+	Method         string              `json:"method,omitempty"`
+	Body           string              `json:"body,omitempty"`
+	Headers        map[string]string   `json:"headers,omitempty"`
+	ReadTimeoutMS  ldvalue.OptionalInt `json:"readTimeoutMs,omitempty"`
+}
+
+type createSSEClientOpts struct {
+	CreateStreamOpts
+	CallbackURL string `json:"callbackUrl"`
+	StreamURL   string `json:"streamUrl"`
+	Tag         string `json:"tag"`
+}
 
 // T represents a test or subtest in our SSE test suite.
 //
@@ -27,20 +54,29 @@ import (
 // causing the test to immediately fail if something unexpected happens, to reduce the amount of
 // boilerplate logic in tests.
 type T struct {
-	context   *framework.Context
-	env       *environment
-	stream    *mockstream.MockStream
-	sseClient *client.TestServiceEntity
+	context          *framework.Context
+	harness          *framework.TestHarness
+	stream           *mockStream
+	callbackReceiver *callbackReceiver
+	sseClientEntity  *framework.TestServiceEntity
 }
 
-type environment struct {
-	client        *client.TestServiceClient
-	streamManager *mockstream.StreamManager
+func newTestScope(context *framework.Context, harness *framework.TestHarness) *T {
+	t := &T{
+		context: context,
+		harness: harness,
+	}
+	t.stream = newMockStream(t.harness, context.DebugLogger())
+	t.callbackReceiver = newCallbackReceiver(t.harness, context.DebugLogger())
+	return t
 }
 
 func (t *T) close() {
-	if t.sseClient != nil {
-		t.sseClient.Close()
+	if t.sseClientEntity != nil {
+		t.sseClientEntity.Close()
+	}
+	if t.callbackReceiver != nil {
+		t.callbackReceiver.Close()
 	}
 	if t.stream != nil {
 		t.stream.Close()
@@ -62,15 +98,14 @@ func (t *T) FailNow() {
 //
 // The specified function receives a new T instance, with its own mock stream.
 func (t *T) Run(name string, action func(*T)) {
-	t1 := &T{env: t.env}
-
+	var t1 *T
 	t.context.Run(name, func(c *framework.Context) {
-		t1.context = c
-		t1.stream = t.env.streamManager.NewMockStream(c.DebugLogger())
+		t1 = newTestScope(c, t.harness)
 		action(t1)
 	})
-
-	t1.close()
+	if t1 != nil {
+		t1.close()
+	}
 }
 
 // Debug logs some debug output for the test. The output will be passed to the test logger at
@@ -82,7 +117,7 @@ func (t *T) Debug(format string, args ...interface{}) {
 // RequireCapability skips this test if the test service did not declare that it supports the
 // specified capability.
 func (t *T) RequireCapability(capability string) {
-	if !t.env.client.HasCapability(capability) {
+	if !t.harness.TestServiceHasCapability(capability) {
 		t.context.SkipWithReason(fmt.Sprintf("test service does not have capability %q", capability))
 	}
 }
@@ -93,8 +128,8 @@ func (t *T) RequireCapability(capability string) {
 // This also causes the test to wait for the client to connect to the mock stream. It will fail
 // and immediately exit the test if it times out while waiting. It returns information about
 // the incoming connection.
-func (t *T) StartSSEClient() *mockstream.IncomingConnection {
-	return t.StartSSEClientOptions(client.CreateStreamOpts{})
+func (t *T) StartSSEClient() framework.IncomingRequestInfo {
+	return t.StartSSEClientOptions(CreateStreamOpts{})
 }
 
 // StartSSEClientOptions tells the test service to start an SSE client with the specified options.
@@ -103,14 +138,18 @@ func (t *T) StartSSEClient() *mockstream.IncomingConnection {
 // This also causes the test to wait for the client to connect to the mock stream. It will fail
 // and immediately exit the test if it times out while waiting. It returns information about
 // the incoming connection.
-func (t *T) StartSSEClientOptions(opts client.CreateStreamOpts) *mockstream.IncomingConnection {
-	opts.StreamURL = t.stream.URL
-	opts.Tag = t.context.ID().String()
-	sseClient, err := t.env.client.CreateEntity(opts, t.context.DebugLogger())
+func (t *T) StartSSEClientOptions(opts CreateStreamOpts) framework.IncomingRequestInfo {
+	clientOpts := createSSEClientOpts{
+		CreateStreamOpts: opts,
+		StreamURL:        t.stream.endpoint.BaseURL(),
+		CallbackURL:      t.callbackReceiver.endpoint.BaseURL(),
+		Tag:              t.context.ID().String(),
+	}
+	sseClient, err := t.harness.NewTestServiceEntity(clientOpts, "SSE client", t.context.DebugLogger())
 	require.NoError(t, err)
-	t.sseClient = sseClient
+	t.sseClientEntity = sseClient
 
-	m, err := sseClient.AwaitMessage()
+	m, err := t.callbackReceiver.AwaitMessage(awaitMessageTimeout)
 	require.NoError(t, err)
 	require.Equal(t, "hello", m.Kind, `test service did not send the expected "hello" message`)
 
@@ -122,10 +161,9 @@ func (t *T) StartSSEClientOptions(opts client.CreateStreamOpts) *mockstream.Inco
 // the incoming connection.
 //
 // Tests only need to call this method if they expect another connection after the first one.
-func (t *T) AwaitNewConnectionToStream() *mockstream.IncomingConnection {
-	cxn, err := t.stream.AwaitConnection()
+func (t *T) AwaitNewConnectionToStream() framework.IncomingRequestInfo {
+	cxn, err := t.stream.endpoint.AwaitConnection(awaitConnectionTimeout)
 	require.NoError(t, err)
-
 	return cxn
 }
 
@@ -146,15 +184,15 @@ func (t *T) SendOnStreamInChunks(data string, chunkSize int, delayBetween time.D
 }
 
 func (t *T) requireSSEClientStarted() {
-	require.NotNil(t, t.sseClient, "test tried to communicate with the SSE client before starting one")
+	require.NotNil(t, t.sseClientEntity, "test tried to communicate with the SSE client before starting one")
 }
 
 // RequireMessage waits for the SSE client in the test service to send us some kind of information.
 //
 // The test fails and immediately exits if it times out without receiving anything.
-func (t *T) RequireMessage() client.ReceivedMessage {
+func (t *T) RequireMessage() ReceivedMessage {
 	t.requireSSEClientStarted()
-	m, err := t.sseClient.AwaitMessage()
+	m, err := t.callbackReceiver.AwaitMessage(awaitMessageTimeout)
 	require.NoError(t, err)
 	return m
 }
@@ -163,7 +201,7 @@ func (t *T) RequireMessage() client.ReceivedMessage {
 //
 // The test fails and immediately exits if it times out without receiving anything, or if what we
 // receive from the test service us is not an event.
-func (t *T) RequireEvent() client.EventMessage {
+func (t *T) RequireEvent() EventMessage {
 	m := t.RequireMessage()
 	if m.Kind != "event" {
 		require.Fail(t, "expected an event but got: %s", m.Kind)
@@ -190,7 +228,7 @@ func (t *T) RequireError() string {
 // method uses a loose comparison where event types of "message" and "" are equal. We can check
 // the default event type behavior in a more specific test, so lack of compliance on that point
 // won't cause all sorts of other tests to fail.
-func (t *T) RequireSpecificEvents(events ...client.EventMessage) {
+func (t *T) RequireSpecificEvents(events ...EventMessage) {
 	for _, expected := range events {
 		if expected.Type == "" {
 			expected.Type = "message"
@@ -220,5 +258,5 @@ func (t *T) RequireComment() string {
 // Not all SSE implementations support this.
 func (t *T) RestartClient() {
 	t.requireSSEClientStarted()
-	require.NoError(t, t.sseClient.SendCommand("restart"))
+	require.NoError(t, t.sseClientEntity.SendCommand("restart"))
 }

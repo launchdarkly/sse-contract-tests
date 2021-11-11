@@ -2,12 +2,10 @@ package ssetests
 
 import (
 	"time"
-
-	"github.com/launchdarkly/sse-contract-tests/client"
 )
 
 func DoLinefeedTests(t *T) {
-	testInputParsing := func(input string, expectedEvents []client.EventMessage) func(t *T) {
+	testInputParsing := func(input string, expectedEvents []EventMessage) func(t *T) {
 		return func(t *T) {
 			t.Run("one chunk", func(t *T) {
 				t.StartSSEClient()
@@ -35,7 +33,7 @@ func DoLinefeedTests(t *T) {
 				"data: event 1"+terminator+terminator+
 					"data: event 2 line 1"+terminator+
 					"data: event 2 line 2"+terminator+terminator,
-				[]client.EventMessage{
+				[]EventMessage{
 					{Data: "event 1"},
 					{Data: "event 2 line 1\nevent 2 line 2"},
 				},
@@ -43,14 +41,14 @@ func DoLinefeedTests(t *T) {
 
 			t.Run("3-line event with empty line at beginning", testInputParsing(
 				"data:"+terminator+"data: line2"+terminator+"data: line3"+terminator+terminator,
-				[]client.EventMessage{
+				[]EventMessage{
 					{Data: "\nline2\nline3"},
 				},
 			))
 
 			t.Run("3-line event with empty line in middle", testInputParsing(
 				"data: line1"+terminator+"data:"+terminator+"data: line3"+terminator+terminator,
-				[]client.EventMessage{
+				[]EventMessage{
 					{Data: "line1\n\nline3"},
 				},
 			))
@@ -58,7 +56,7 @@ func DoLinefeedTests(t *T) {
 			t.Run("ignores 1 extra empty line", testInputParsing(
 				"data: event 1"+terminator+terminator+terminator+
 					"data: event 2"+terminator+terminator,
-				[]client.EventMessage{
+				[]EventMessage{
 					{Data: "event 1"},
 					{Data: "event 2"},
 				},
@@ -67,7 +65,7 @@ func DoLinefeedTests(t *T) {
 			t.Run("ignores 2 extra empty lines", testInputParsing(
 				"data: event 1"+terminator+terminator+terminator+terminator+
 					"data: event 2"+terminator+terminator,
-				[]client.EventMessage{
+				[]EventMessage{
 					{Data: "event 1"},
 					{Data: "event 2"},
 				},
@@ -90,8 +88,8 @@ func DoLinefeedTests(t *T) {
 		t.SendOnStream("\r")
 		t.SendOnStream("\n")
 		t.RequireSpecificEvents(
-			client.EventMessage{Data: "Hello\nWorld"},
-			client.EventMessage{Data: "OK"},
+			EventMessage{Data: "Hello\nWorld"},
+			EventMessage{Data: "OK"},
 		)
 	})
 }

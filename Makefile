@@ -14,7 +14,7 @@ LINTER_VERSION_FILE=./bin/.golangci-lint-version-$(GOLANGCI_LINT_VERSION)
 .PHONY: build clean lint docker-build docker-push docker-smoke-test
 
 build:
-	go build ./...
+	go build
 
 clean:
 	go clean

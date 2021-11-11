@@ -6,8 +6,6 @@ import (
 	"runtime/debug"
 )
 
-type Filter func(TestID) bool
-
 type environment struct {
 	results    Results
 	testLogger TestLogger
