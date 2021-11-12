@@ -1,4 +1,7 @@
-FROM golang:1.14 as builder
+# This Dockerfile is for local testing. It is not the Docker image that will be published in
+# releases; that is built by Goreleaser.
+
+FROM golang:1.15 as builder
 
 RUN mkdir /testharness
 
@@ -11,6 +14,7 @@ RUN cd /testharness && CGO_ENABLED=0 go build
 FROM alpine:3.14
 
 RUN mkdir /testharness
-COPY --from=builder /testharness/sse-contract-tests /testharness/sse-contract-tests
+COPY --from=builder /testharness/sse-contract-tests /testharness
 
+EXPOSE 8111
 ENTRYPOINT [ "/testharness/sse-contract-tests" ]

@@ -1,4 +1,6 @@
 .circleci
 .git
+bin
+dist
 Dockerfile
 sse-contract-tests

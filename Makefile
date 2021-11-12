@@ -1,17 +1,12 @@
 
-DOCKER_IMAGE_NAME=ldcircleci/sse-contract-tests
-DOCKER_IMAGE_MAJOR_VERSION=1
-DOCKER_IMAGE_MINOR_VERSION=0
-DOCKER_IMAGE_PATCH_VERSION=0
-DOCKER_IMAGE_TAG_FULL=$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_MAJOR_VERSION).$(DOCKER_IMAGE_MINOR_VERSION).$(DOCKER_IMAGE_PATCH_VERSION)
-DOCKER_IMAGE_TAG_MINOR=$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_MAJOR_VERSION).$(DOCKER_IMAGE_MINOR_VERSION)
-DOCKER_IMAGE_TAG_MAJOR=$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_MAJOR_VERSION)
+GORELEASER_VERSION=v0.141.0
+GORELEASER_CMD=curl -sL https://git.io/goreleaser | GOPATH=$(mktemp -d) VERSION=$(GORELEASER_VERSION) bash -s -- --rm-dist
 
 GOLANGCI_LINT_VERSION=v1.27.0
 LINTER=./bin/golangci-lint
 LINTER_VERSION_FILE=./bin/.golangci-lint-version-$(GOLANGCI_LINT_VERSION)
 
-.PHONY: build clean lint docker-build docker-push docker-smoke-test
+.PHONY: build clean lint build-release publish-release docker-build docker-push docker-smoke-test
 
 build:
 	go build
@@ -28,16 +23,14 @@ $(LINTER_VERSION_FILE):
 lint: $(LINTER_VERSION_FILE)
 	$(LINTER) run ./...
 
-docker-build:
-	docker build --tag $(DOCKER_IMAGE_TAG_FULL) .
-	docker tag $(DOCKER_IMAGE_TAG_FULL) $(DOCKER_IMAGE_TAG_MAJOR)
-	docker tag $(DOCKER_IMAGE_TAG_FULL) $(DOCKER_IMAGE_TAG_MINOR)
+build-release:
+	$(GORELEASER_CMD) --snapshot --skip-publish --skip-validate
 
-docker-push: docker-build
-	docker login
-	docker push $(DOCKER_IMAGE_TAG_FULL)
-	docker push $(DOCKER_IMAGE_TAG_MAJOR)
-	docker push $(DOCKER_IMAGE_TAG_MINOR)
+publish-release:
+	$(GORELEASER_CMD)
+
+docker-build:
+	docker build --tag ldcircleci/sse-contract-tests .
 
 docker-smoke-test: docker-build
 	@# To verify that the built image actually works, we'll run it against a fake service
@@ -50,7 +43,7 @@ docker-smoke-test: docker-build
 		bash -c "while true ; do echo -e \"HTTP/1.1 500 Nope\n\n\" | nc -l -p 8000 ; done"
 
 	@echo "Running test harness against fake service"
-	(docker run --rm -p 8111:8111 --network sse-contract-tests-shared $(DOCKER_IMAGE_TAG_FULL) \
+	(docker run --rm -p 8111:8111 --network sse-contract-tests-shared ldcircleci/sse-contract-tests \
 		--url http://smoke-test-fake-service:8000 2>&1 || true) \
 		| tee /tmp/sse-contract-tests-smoketest.log
 

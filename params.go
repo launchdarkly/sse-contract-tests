@@ -1,10 +1,10 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/launchdarkly/sse-contract-tests/framework"
@@ -22,7 +22,7 @@ type commandParams struct {
 	outputDockerScriptVersion string
 }
 
-func (c *commandParams) Read(args []string) error {
+func (c *commandParams) Read(args []string) bool {
 	fs := flag.NewFlagSet("", flag.ExitOnError)
 	fs.StringVar(&c.serviceURL, "url", "", "test service URL")
 	fs.StringVar(&c.host, "host", "localhost", "external hostname of the test harness")
@@ -34,12 +34,16 @@ func (c *commandParams) Read(args []string) error {
 	fs.StringVar(&c.outputDockerScriptVersion, "output-docker-script", "", "output a script for running the test in Docker (see README)")
 
 	if err := fs.Parse(args[1:]); err != nil {
-		return err
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
+		return false
 	}
 	if c.serviceURL == "" {
-		return errors.New("--url is required")
+		fmt.Fprintln(os.Stderr, "-url is required")
+		fs.Usage()
+		return false
 	}
-	return nil
+	return true
 }
 
 func (c commandParams) outputDockerScript() {
@@ -49,19 +53,19 @@ func (c commandParams) outputDockerScript() {
 
 	var dockerArgs commandBuilder
 	dockerArgs.add(fmt.Sprintf("ldcircleci/sse-contract-tests:%s", c.outputDockerScriptVersion))
-	dockerArgs.add("--url", c.serviceURL)
-	dockerArgs.add("--host", "testharness")
+	dockerArgs.add("-url", c.serviceURL)
+	dockerArgs.add("-host", "testharness")
 	for _, r := range c.filters.MustMatch {
-		dockerArgs.add("--run", r.String())
+		dockerArgs.add("-run", r.String())
 	}
 	for _, r := range c.filters.MustNotMatch {
-		dockerArgs.add("--skip", r.String())
+		dockerArgs.add("-skip", r.String())
 	}
 	if c.debug {
-		dockerArgs.add("--debug")
+		dockerArgs.add("-debug")
 	}
 	if c.debugAll {
-		dockerArgs.add("--debug-all")
+		dockerArgs.add("-debug-all")
 	}
 
 	cleanupCommand := fmt.Sprintf("docker stop %s >/dev/null 2>&1; docker network rm contract-tests-network >/dev/null 2>&1",

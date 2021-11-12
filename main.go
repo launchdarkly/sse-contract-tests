@@ -14,9 +14,10 @@ const defaultPort = 8111
 const statusQueryTimeout = time.Second * 10
 
 func main() {
+	fmt.Printf("sse-contract-tests v%s\n", Version)
+
 	var params commandParams
-	if err := params.Read(os.Args); err != nil {
-		fmt.Fprintf(os.Stderr, "Invalid parameters: %s\n", err)
+	if !params.Read(os.Args) {
 		os.Exit(1)
 	}
 

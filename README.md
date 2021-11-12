@@ -43,6 +43,8 @@ docker run ldcircleci/sse-contract-tests:1 \
 
 The output of this command is a script which, if piped back into the shell (`| bash`), will take care of setting up the shared network, starting the test service container, running the test harness container, and cleaning up afterward. It will also dump the log output of the test service container if any tests failed.
 
+Note that the Docker tag version here is specified only as "1" rather than a more specific version (both in the first parameter to `docker run`, and in the version parameter that follows `--output-docker-script`). That ensures that you will always be getting the latest 1.x version of the test harness.
+
 ## Test service endpoints
 
 ### Status resource: `GET /`
