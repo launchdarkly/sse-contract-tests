@@ -18,8 +18,6 @@ type MockEndpoint struct {
 	description string
 	basePath    string
 	handler     http.Handler
-	maxConns    int
-	curConns    int
 	newConns    chan IncomingRequestInfo
 	cancels     []*context.CancelFunc
 	logger      Logger
@@ -48,7 +46,6 @@ type IncomingRequestInfo struct {
 // Done channel will be closed if Close is called on the endpoint.
 func (h *TestHarness) NewMockEndpoint(
 	handler http.Handler,
-	maxConnections int,
 	logger Logger,
 ) *MockEndpoint {
 	if logger == nil {
@@ -57,8 +54,7 @@ func (h *TestHarness) NewMockEndpoint(
 	e := &MockEndpoint{
 		owner:    h,
 		handler:  handler,
-		maxConns: maxConnections,
-		newConns: make(chan IncomingRequestInfo, maxConnections),
+		newConns: make(chan IncomingRequestInfo, 100),
 		logger:   logger,
 	}
 	h.lock.Lock()

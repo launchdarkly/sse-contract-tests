@@ -61,7 +61,7 @@ func newCallbackReceiver(harness *framework.TestHarness, logger framework.Logger
 		logger: logger,
 		output: make(chan entityOutput, 1000),
 	}
-	c.endpoint = harness.NewMockEndpoint(c, 100, logger)
+	c.endpoint = harness.NewMockEndpoint(c, logger)
 	return c
 }
 

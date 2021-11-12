@@ -3,18 +3,21 @@ package ssetests
 import (
 	"encoding/json"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/launchdarkly/sse-contract-tests/framework"
 )
 
 // mockStream is a mock SSE service attached to one of the test harness's mock endpoints.
-// It only allows a single connection from the test service at a time, and gives the test
-// logic a way to inject data into that connection.
+// It gives the test logic a way to inject stream data that will be served up by the endpoint.
+// It is not a multiplexing SSE server-- any data injected by the test logic will only go to
+// the most recent client connection.
 type mockStream struct {
 	endpoint *framework.MockEndpoint
 	logger   framework.Logger
 	dataCh   chan streamChunk
+	lock     sync.Mutex
 }
 
 type streamChunk struct {
@@ -31,7 +34,7 @@ func newMockStream(
 		logger: logger,
 	}
 	streamLogger := framework.LoggerWithPrefix(logger, "[mock stream] ")
-	s.endpoint = harness.NewMockEndpoint(s, 1, streamLogger)
+	s.endpoint = harness.NewMockEndpoint(s, streamLogger)
 	return s
 }
 
@@ -42,12 +45,12 @@ func (s *mockStream) Close() {
 
 // SendChunk sends a chunk of data on the stream and flushes the stream.
 func (s *mockStream) SendChunk(data string) {
-	s.SendChunkThenWait(data, 0)
+	s.send(streamChunk{data: []byte(data)})
 }
 
 // SendChunkThenWait sends a chunk of data, flushes it, and then sleeps for an interval.
 func (s *mockStream) SendChunkThenWait(data string, delay time.Duration) {
-	s.dataCh <- streamChunk{data: []byte(data), delayAfter: delay}
+	s.send(streamChunk{data: []byte(data), delayAfter: delay})
 }
 
 // SendSplit breaks a string into multiple chunks of the specified byte length, and then sends
@@ -63,14 +66,24 @@ func (s *mockStream) SendSplit(data string, chunkSize int, delayBetween time.Dur
 		if max < len(bytes) {
 			chunk.delayAfter = delayBetween
 		}
-		s.dataCh <- chunk
+		s.send(chunk)
 	}
+}
+
+func (s *mockStream) send(chunk streamChunk) {
+	// Grab the channel under a lock because if a new connection arrives, we will replace
+	// the channel with a new channel. That ensures that the test data is only ever going
+	// to one connection at a time.
+	s.lock.Lock()
+	ch := s.dataCh
+	s.lock.Unlock()
+	ch <- chunk
 }
 
 // Interrupt closes the current connection.
 func (s *mockStream) Interrupt() {
 	s.logger.Printf("Deliberately breaking stream connection")
-	s.dataCh <- streamChunk{data: nil}
+	s.send(streamChunk{data: nil})
 }
 
 func (s *mockStream) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -81,10 +94,14 @@ func (s *mockStream) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	flusher.Flush()
 
+	s.lock.Lock() // see comment on send()
+	ch := s.dataCh
+	s.lock.Unlock()
+
 Loop:
 	for {
 		select {
-		case chunk, ok := <-s.dataCh:
+		case chunk, ok := <-ch:
 			if !ok {
 				break Loop
 			}

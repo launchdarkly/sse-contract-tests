@@ -119,14 +119,6 @@ func (h *TestHarness) serveHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	e.lock.Lock()
-	if e.curConns >= e.maxConns {
-		cur := e.curConns
-		e.lock.Unlock()
-		e.logger.Printf("Received an unexpected request when the endpoint already had %d active connection(s)", cur)
-		w.WriteHeader(http.StatusTooManyRequests)
-		return
-	}
-	e.curConns++
 	ctx, canceller := context.WithCancel(req.Context())
 	cancellerPtr := &canceller
 	e.cancels = append(e.cancels, cancellerPtr)
@@ -156,7 +148,6 @@ func (h *TestHarness) serveHTTP(w http.ResponseWriter, req *http.Request) {
 	e.handler.ServeHTTP(w, transformedReq)
 
 	e.lock.Lock()
-	e.curConns--
 	for i, c := range e.cancels {
 		if c == cancellerPtr { // can't compare functions with ==, but can compare pointers
 			e.cancels = append(e.cancels[:i], e.cancels[i+1:]...)
