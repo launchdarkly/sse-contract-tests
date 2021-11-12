@@ -9,9 +9,7 @@ func DoCommentTests(t *T) {
 
 	t.Run("single comment", func(t *T) {
 		t.StartSSEClient()
-
 		t.SendOnStream(":Hello\n")
-
 		c := t.RequireComment()
 		assert.Equal(t, "Hello", c)
 	})
@@ -20,12 +18,10 @@ func DoCommentTests(t *T) {
 		t.StartSSEClient()
 
 		t.SendOnStream(":Hello\n")
-
 		c1 := t.RequireComment()
 		assert.Equal(t, "Hello", c1)
 
 		t.SendOnStream(":World\n")
-
 		c2 := t.RequireComment()
 		assert.Equal(t, "World", c2)
 	})
