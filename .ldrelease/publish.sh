@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -eu
+
 # Note that Docker commands in this script are being sudo'd. That's because we are
 # already running inside a container, and rather than trying to run a whole nested
 # Docker daemon inside that container, we are sharing the host's Docker daemon. But

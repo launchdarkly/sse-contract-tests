@@ -20,6 +20,15 @@ release:
   disable: true # this disables releasing *to GitHub*; it will still push to Docker
   # (we want Releaser to be responsible for doing all the GitHub release manipulations)
 
+snapshot:
+  # Allows you to change the name of the generated snapshot
+  #
+  # Note that some pipes require this to be semantic version compliant (nfpm,
+  # for example).
+  #
+  # Default is `{{ .Version }}-SNAPSHOT-{{.ShortCommit}}`.
+  name_template: '{{ if index .Env "LD_RELEASE_VERSION"  }}{{ .Env.LD_RELEASE_VERSION }}{{ else }}0.0.0-SNAPSHOT{{ end }}'
+
 archives:
   -
     format: tar.gz
