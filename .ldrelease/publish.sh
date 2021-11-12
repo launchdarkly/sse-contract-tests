@@ -6,7 +6,8 @@ set -eu
 # already running inside a container, and rather than trying to run a whole nested
 # Docker daemon inside that container, we are sharing the host's Docker daemon. But
 # the mechanism for doing so involves sharing a socket path (docker.sock) that is
-# only accessible by root.
+# only accessible by root. Also, the PATH=$PATH is necessary to make sure commands
+# like "go" can be found in the sudo environment.
 
 docker_username="$(cat "${LD_RELEASE_SECRETS_DIR}/docker_username")"
 cat "${LD_RELEASE_SECRETS_DIR}/docker_token" | sudo docker login --username "${docker_username}" --password-stdin

@@ -15,5 +15,5 @@ cp dist/*.tar.gz dist/*.zip "${LD_RELEASE_ARTIFACTS_DIR}"
 # Copy the Docker image that goreleaser just built into the artifacts - we only do
 # this in a dry run, because in a real release the image will be available from
 # DockerHub anyway so there's no point in attaching it to the release.
-image_archive_name=sse-contract-tests-docker-image.tar.gz
-sudo docker save launchdarkly/sse-contract-tests:${LD_RELEASE_VERSION} | gzip >${LD_RELEASE_ARTIFACTS_DIR}/${image_archive_name}
+image_archive_name=sse-contract-tests_docker-image.tar.gz
+sudo docker save ldcircleci/sse-contract-tests:${LD_RELEASE_VERSION} | gzip >${LD_RELEASE_ARTIFACTS_DIR}/${image_archive_name}
