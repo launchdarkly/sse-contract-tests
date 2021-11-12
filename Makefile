@@ -24,7 +24,7 @@ lint: $(LINTER_VERSION_FILE)
 	$(LINTER) run ./...
 
 build-release:
-	$(GORELEASER_CMD) --snapshot --skip-publish --skip-validate --debug
+	$(GORELEASER_CMD) --snapshot --skip-publish --skip-validate
 
 publish-release:
 	$(GORELEASER_CMD)

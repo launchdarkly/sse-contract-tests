@@ -11,5 +11,5 @@ set -eu
 docker_username="$(cat "${LD_RELEASE_SECRETS_DIR}/docker_username")"
 cat "${LD_RELEASE_SECRETS_DIR}/docker_token" | sudo docker login --username "${docker_username}" --password-stdin
 
-sudo make publish-release
+sudo PATH=$PATH make publish-release
 cp dist/*.tar.gz dist/*.zip "${LD_RELEASE_ARTIFACTS_DIR}"
