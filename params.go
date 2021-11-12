@@ -17,6 +17,7 @@ type commandParams struct {
 	port                      int
 	host                      string
 	filters                   framework.RegexFilters
+	stopServiceAtEnd          bool
 	debug                     bool
 	debugAll                  bool
 	outputDockerScriptVersion string
@@ -29,6 +30,7 @@ func (c *commandParams) Read(args []string) bool {
 	fs.IntVar(&c.port, "port", defaultPort, "port that the test harness will listen on")
 	fs.Var(&c.filters.MustMatch, "run", "regex pattern(s) to select tests to run")
 	fs.Var(&c.filters.MustNotMatch, "skip", "regex pattern(s) to select tests not to run")
+	fs.BoolVar(&c.stopServiceAtEnd, "stop-service-at-end", false, "tell test service to exit after the test run")
 	fs.BoolVar(&c.debug, "debug", false, "enable debug logging for failed tests")
 	fs.BoolVar(&c.debugAll, "debug-all", false, "enable debug logging for all tests")
 	fs.StringVar(&c.outputDockerScriptVersion, "output-docker-script", "", "output a script for running the test in Docker (see README)")

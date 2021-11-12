@@ -1,6 +1,6 @@
 module github.com/launchdarkly/sse-contract-tests
 
-go 1.14
+go 1.16
 
 require (
 	github.com/alessio/shellescape v1.4.1

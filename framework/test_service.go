@@ -63,6 +63,17 @@ func queryTestServiceInfo(url string, timeout time.Duration, output io.Writer) (
 	}
 }
 
+// StopService tells the test service that it should exit.
+func (h *TestHarness) StopService() error {
+	req, _ := http.NewRequest("DELETE", h.testServiceBaseURL, nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err == nil && resp.StatusCode >= 300 {
+		return fmt.Errorf("service returned HTTP %d", resp.StatusCode)
+	}
+	// It's normal for the request to return an I/O error if the service immediately quit before sending a response
+	return nil
+}
+
 // NewTestServiceEntity tells the test service to create a new instance of whatever kind of entity
 // it manages, based on the parameters we provide. The test harness can interact with it via the
 // returned TestServiceEntity. The entity is assumed to remain active inside the test service

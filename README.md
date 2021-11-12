@@ -18,32 +18,34 @@ Options besides `--url`:
 * `--port <PORT>` - sets the callback port that test services will connect to (default: 8111)
 * `--run <REGEX>` - skips any tests whose names do not match the specified regex (can specify more than one)
 * `--skip <REGEX>` - skips any tests whose names match the specified regex (can specify more than one)
+* `--stop-service-at-end` - tells the test service to exit after the test run
 * `--debug` - enables verbose logging of test actions for failed tests
 * `--debug-all` - enables verbose logging of test actions for all tests
 
 For `--run` and `--skip`, the name of a test is the string that appears between brackets in the test output. This may have multiple segments delimited by slashes, such as `name of test category/name of subtest`.
 
-## Running with Docker
+## Downloading/deploying
 
-In a CI job for an SSE implementation, the most convenient way to run the test suite is with Docker. The executable test harness is published as the Docker image `ldcircleci/sse-contract-tests:1`. This major version number will be updated if there is ever a non-backward-compatible change.
+In a CI job for an SSE implementation, the most convenient way to run the test suite is by invoking the `downloader/run.sh` script, which downloads the compiled executable and runs it. This is similar to how tools such as Goreleaser are normally run. You must set `VERSION` to the desired version of the tool, and `PARAMS` to the command-line parameters.
 
-Since the test harness and the test service need to be able to make requests to each other, you will either need to use host networking or create a Docker bridge network. The latter is the only way to do it in CircleCI (you will also need to use `setup_remote_docker` to enable this in CircleCI).
-
-Because the steps for doing this are basically always the same except for the initial step of building the test service, the tool can provide a script for running itself. It works like this:
-
-First, build the Docker image for your test service. It should be configured to run the service as soon as the container is started.
-
-Then, run this command, where `<SERVICENAME>` is the name of the Docker image you just built, `<SERVICEPORT>` is the port it will listen on, and `<OTHER_TEST_PARAMS>` are any other command-line parameters you want to pass to the test tool:
-
-```
-docker run ldcircleci/sse-contract-tests:1 \
-  --url http://<SERVICENAME>:<SERVICEPORT> <OTHER_TEST_PARAMS> \
-  --output-docker-script 1
+```shell
+VERSION=v1 PARAMS="--url http://localhost:8000" \
+  curl https://github.com/launchdarkly/sse-contract-tests/blob/master/downloader/run.sh | bash 
 ```
 
-The output of this command is a script which, if piped back into the shell (`| bash`), will take care of setting up the shared network, starting the test service container, running the test harness container, and cleaning up afterward. It will also dump the log output of the test service container if any tests failed.
+You can specify an exact version string such as `v1.0.0` in `VERSION`, but it is better to specify only a major version so that you will automatically get any backward-compatible improvements in the test harness.
 
-Note that the Docker tag version here is specified only as "1" rather than a more specific version (both in the first parameter to `docker run`, and in the version parameter that follows `--output-docker-script`). That ensures that you will always be getting the latest 1.x version of the test harness.
+There is also a published Docker image that you can run, `ldcircleci/sse-contract-tests`. Again you can specify either a specific version or a major version, such as `ldcircleci/sse-contract-tests:1`. In order for this to work, the test harness must be able to see the test service and vice versa, so you must remember to expose the callback port on the test harness container-- and you must tell Docker to use either host networking (if the test service is running locally outside of Docker) or a shared network (if the test service is running in Docker).
+
+```shell
+# With host networking
+docker run --network host ldcircleci/sse-contract-tests:1 \
+  --url http://localhost:8000
+
+# With a shared network
+docker run --network my-network-name ldcircleci/sse-contract-tests:1 \
+  --url http://test-service-container-name:8000
+```
 
 ## Test service endpoints
 
@@ -61,6 +63,10 @@ This resource should return a 200 status to indicate that the service has starte
   * `"restart"`: The caller can tell the SSE client at any time to disconnect and retry.
 
 The test harness will use the `capabilities` information to decide whether to run optional parts of the test suite that relate to those capabilities.
+
+### Stop test service: `DELETE /`
+
+The test harness sends this request at the end of a test run if you have specified `--stop-service-at-end`. The test service should simply quit. This is a convenience so CI scripts can simply start the test service in the background and assume it will be stopped for them.
 
 ### Create stream: `POST /`
 
@@ -135,3 +141,17 @@ This message indicates that the test service has received an error from the SSE 
   "comment": "the error message"
 }
 ```
+
+# About LaunchDarkly
+
+* LaunchDarkly is a continuous delivery platform that provides feature flags as a service and allows developers to iterate quickly and safely. We allow you to easily flag your features and manage them from the LaunchDarkly dashboard.  With LaunchDarkly, you can:
+    * Roll out a new feature to a subset of your users (like a group of users who opt-in to a beta tester group), gathering feedback and bug reports from real-world use cases.
+    * Gradually roll out a feature to an increasing percentage of users, and track the effect that the feature has on key metrics (for instance, how likely is a user to complete a purchase if they have feature A versus feature B?).
+    * Turn off a feature that you realize is causing performance problems in production, without needing to re-deploy, or even restart the application with a changed configuration file.
+    * Grant access to certain features based on user attributes, like payment plan (eg: users on the ‘gold’ plan get access to more features than users in the ‘silver’ plan). Disable parts of your application to facilitate maintenance, without taking everything offline.
+* LaunchDarkly provides feature flag SDKs for a wide variety of languages and technologies. Check out [our documentation](https://docs.launchdarkly.com/docs) for a complete list.
+* Explore LaunchDarkly
+    * [launchdarkly.com](https://www.launchdarkly.com/ "LaunchDarkly Main Website") for more information
+    * [docs.launchdarkly.com](https://docs.launchdarkly.com/  "LaunchDarkly Documentation") for our documentation and SDK reference guides
+    * [apidocs.launchdarkly.com](https://apidocs.launchdarkly.com/  "LaunchDarkly API Documentation") for our API documentation
+    * [launchdarkly.com/blog](https://launchdarkly.com/blog/  "LaunchDarkly Blog Documentation") for the latest product updates

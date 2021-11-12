@@ -2,7 +2,7 @@ version: 2
 
 jobs:
   - docker:
-      image: cimg/go:1.15.13
+      image: cimg/go:1.16
       copyGitHistory: true
     template:
       name: go

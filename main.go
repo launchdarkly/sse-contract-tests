@@ -1,9 +1,11 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/launchdarkly/sse-contract-tests/framework"
@@ -13,8 +15,11 @@ import (
 const defaultPort = 8111
 const statusQueryTimeout = time.Second * 10
 
+//go:embed VERSION
+var versionString string
+
 func main() {
-	fmt.Printf("sse-contract-tests v%s\n", Version)
+	fmt.Printf("sse-contract-tests v%s\n", strings.TrimSpace(versionString))
 
 	var params commandParams
 	if !params.Read(os.Args) {
@@ -58,6 +63,13 @@ func main() {
 
 	fmt.Println()
 	framework.PrintResults(results)
+
+	if params.stopServiceAtEnd {
+		fmt.Println("Stopping test service")
+		if err := harness.StopService(); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to stop test service: %s\n", err)
+		}
+	}
 	if !results.OK() {
 		os.Exit(1)
 	}
