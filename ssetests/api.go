@@ -251,3 +251,17 @@ func (t *T) RestartClient() {
 	t.requireSSEClientStarted()
 	require.NoError(t, t.sseClientEntity.SendCommand("restart"))
 }
+
+// TellClientToExpectEventType tells the SSE client in the test service that it should be ready to
+// receive an event with the specified type. This is only necessary for SSE implementations that
+// require you to explicitly listen for each event type.
+func (t *T) TellClientToExpectEventType(eventType string) {
+	if !t.harness.TestServiceHasCapability("event-type-listeners") {
+		// If the test service doesn't advertise this capability, then it is able to receive
+		// events of any type without specifically listening for them.
+		return
+	}
+	t.requireSSEClientStarted()
+	require.NoError(t, t.sseClientEntity.SendCommand("listen",
+		map[string]interface{}{"type": eventType}))
+}

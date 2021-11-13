@@ -38,6 +38,7 @@ func DoBasicParsingTests(t *T) {
 
 	t.Run("event with specific type", func(t *T) {
 		t.StartSSEClient()
+		t.TellClientToExpectEventType("greeting")
 		t.SendOnStream("event: greeting\ndata: Hello\n\n")
 		t.RequireSpecificEvents(EventMessage{Type: "greeting", Data: "Hello"})
 	})
@@ -56,30 +57,35 @@ func DoBasicParsingTests(t *T) {
 
 	t.Run("event with type and ID", func(t *T) {
 		t.StartSSEClient()
+		t.TellClientToExpectEventType("greeting")
 		t.SendOnStream("event: greeting\nid: abc\ndata: Hello\n\n")
 		t.RequireSpecificEvents(EventMessage{Type: "greeting", ID: "abc", Data: "Hello"})
 	})
 
 	t.Run("fields in reverse order", func(t *T) {
 		t.StartSSEClient()
+		t.TellClientToExpectEventType("greeting")
 		t.SendOnStream("data: Hello\nid: abc\nevent: greeting\n\n")
 		t.RequireSpecificEvents(EventMessage{Type: "greeting", ID: "abc", Data: "Hello"})
 	})
 
 	t.Run("unknown field is ignored", func(t *T) {
 		t.StartSSEClient()
+		t.TellClientToExpectEventType("greeting")
 		t.SendOnStream("event: greeting\ncolor: blue\ndata: Hello\n\n")
 		t.RequireSpecificEvents(EventMessage{Type: "greeting", Data: "Hello"})
 	})
 
 	t.Run("fields without leading space", func(t *T) {
 		t.StartSSEClient()
+		t.TellClientToExpectEventType("greeting")
 		t.SendOnStream("event:greeting\ndata:Hello\n\n")
 		t.RequireSpecificEvents(EventMessage{Type: "greeting", Data: "Hello"})
 	})
 
 	t.Run("fields with extra leading space", func(t *T) {
 		t.StartSSEClient()
+		t.TellClientToExpectEventType(" greeting")
 		t.SendOnStream("event:  greeting\ndata:  Hello\n\n")
 		t.RequireSpecificEvents(EventMessage{Type: " greeting", Data: " Hello"})
 	})

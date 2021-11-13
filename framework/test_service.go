@@ -22,6 +22,7 @@ type TestServiceInfo struct {
 // which the test harness will interact with.
 type TestServiceEntity struct {
 	resourceURL string
+	logger      Logger
 }
 
 type commandRequestParams struct {
@@ -125,6 +126,7 @@ func (h *TestHarness) NewTestServiceEntity(
 
 	e := &TestServiceEntity{
 		resourceURL: resourceURL,
+		logger:      logger,
 	}
 
 	return e, nil
@@ -150,8 +152,15 @@ func (e *TestServiceEntity) Close() error {
 }
 
 // SendCommand sends a command to the test service entity.
-func (e *TestServiceEntity) SendCommand(command string) error {
-	data, _ := json.Marshal(commandRequestParams{Command: command})
+func (e *TestServiceEntity) SendCommand(command string, additionalParams ...map[string]interface{}) error {
+	allParams := map[string]interface{}{"command": command}
+	for _, p := range additionalParams {
+		for k, v := range p {
+			allParams[k] = v
+		}
+	}
+	data, _ := json.Marshal(allParams)
+	e.logger.Printf("Sending command: %s", string(data))
 	resp, err := http.DefaultClient.Post(e.resourceURL, "application/json", bytes.NewBuffer(data))
 	if err != nil {
 		return err

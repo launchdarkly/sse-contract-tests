@@ -55,6 +55,7 @@ This resource should return a 200 status to indicate that the service has starte
 
 * `capabilities`: An array of strings describing optional features that this SSE implementation supports:
   * `"comments"`: The SSE client allows the caller to read comment lines. All SSE implementations must be able to handle comment lines, but many of them will simply discard the comments and not allow them to be seen.
+  * `"event-type-listeners"`: This means that the SSE client's API requires the caller to explicitly listen for any event type that is not the default `"message"`.
   * `"headers"`: The SSE client can be configured to send custom headers.
   * `"last-event-id"`: The SSE client can be configured to send a specific `Last-Event-Id` value in its initial HTTP request.
   * `"post"`: The SSE client can be configured to send a `POST` request with a body instead of a `GET`.
@@ -87,9 +88,10 @@ If any parameters are invalid, return HTTP `400`.
 
 ### Send command: `POST <URL of stream instance>`
 
-A `POST` request to the resource that was returned by "Create stream" means the test harness wants to do something to an existing SSE client instance. The request body is a JSON object with the following property:
+A `POST` request to the resource that was returned by "Create stream" means the test harness wants to do something to an existing SSE client instance. The request body is a JSON object which can be one of the following:
 
-* `command`: Currently the only supported value is `"restart"`, meaning the stream should be disconnected and reconnected with the same stream URL. This will only be sent if the test service has the `"restart"` capability.
+* `{ "command": "listen", "type": "<EVENT TYPE>" }` - The SSE client should be ready to receive events with the type `EVENT TYPE`. This will only be sent if the test service has the `"event-type-listeners"` capability.
+* `{ "command": "restart" }` - The SSE client should disconnect and reconnect with the same stream URL. This will only be sent if the test service has the `"restart"` capability.
 
 Return any HTTP `2xx` status, `400` for an unrecognized command, or `404` if there is no such stream.
 
