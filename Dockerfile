@@ -1,7 +1,7 @@
 # This Dockerfile is for local testing. It is not the Docker image that will be published in
 # releases; that is built by Goreleaser.
 
-FROM golang:1.15 as builder
+FROM golang:1.16 as builder
 
 RUN mkdir /testharness
 
