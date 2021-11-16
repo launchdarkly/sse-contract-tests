@@ -4,9 +4,17 @@ workflows:
   version: 2
   test:
     jobs:
+    - build-and-test
     - docker-build-and-smoke-test
 
 jobs:
+  build-and-test:
+    docker:
+      - image: cimg/go:1.17
+    steps:
+      - checkout
+      - make test
+
   docker-build-and-smoke-test:
     docker:
       - image: cimg/base:2021.10

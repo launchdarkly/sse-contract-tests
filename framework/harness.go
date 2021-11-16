@@ -1,26 +1,21 @@
 package framework
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 )
 
-const endpointPathPrefix = "/endpoints/"
 const httpListenerTimeout = time.Second * 10
 
 type TestHarness struct {
 	testServiceBaseURL         string
 	testHarnessExternalBaseURL string
 	testServiceInfo            TestServiceInfo
-	endpoints                  map[string]*MockEndpoint
-	lastEndpointID             int
+	mockEndpoints              *mockEndpointsManager
 	logger                     Logger
 	lock                       sync.Mutex
 }
@@ -40,12 +35,12 @@ func NewTestHarness(
 		debugLogger = NullLogger()
 	}
 
-	externalBaseUrl := fmt.Sprintf("http://%s:%d", testHarnessExternalHostname, testHarnessPort)
+	externalBaseURL := fmt.Sprintf("http://%s:%d", testHarnessExternalHostname, testHarnessPort)
 
 	h := &TestHarness{
 		testServiceBaseURL:         testServiceBaseURL,
-		testHarnessExternalBaseURL: externalBaseUrl,
-		endpoints:                  make(map[string]*MockEndpoint),
+		testHarnessExternalBaseURL: externalBaseURL,
+		mockEndpoints:              newMockEndpointsManager(externalBaseURL, debugLogger),
 		logger:                     debugLogger,
 	}
 
@@ -75,86 +70,33 @@ func (h *TestHarness) TestServiceHasCapability(desired string) bool {
 	return false
 }
 
-func (h *TestHarness) serveHTTP(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "HEAD" {
+// NewEndpoint adds a new endpoint that can receive requests.
+//
+// The specified handler will be called for all incoming requests to the endpoint's
+// base URL or any subpath of it. For instance, if the generated base URL (as reported
+// by MockEndpoint.BaseURL()) is http://localhost:8111/endpoints/3, then it can also
+// receive requests to http://localhost:8111/endpoints/3/some/subpath.
+//
+// When the handler is called, the test harness rewrites the request URL first so that
+// the handler sees only the subpath. It also attaches a Context to the request whose
+// Done channel will be closed if Close is called on the endpoint.
+func (h *TestHarness) NewMockEndpoint(
+	handler http.Handler,
+	contextFn func(context.Context) context.Context,
+	logger Logger,
+) *MockEndpoint {
+	if logger == nil {
+		logger = h.logger
+	}
+	return h.mockEndpoints.newMockEndpoint(handler, contextFn, logger)
+}
+
+func (h *TestHarness) serveHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "HEAD" {
 		w.WriteHeader(200) // we use this to test whether our own listener is active yet
 		return
 	}
-
-	if !strings.HasPrefix(req.URL.Path, endpointPathPrefix) {
-		h.logger.Printf("Received request for unrecognized URL path %s", req.URL.Path)
-		w.WriteHeader(404)
-		return
-	}
-	path := strings.TrimPrefix(req.URL.Path, endpointPathPrefix)
-	var endpointID string
-	slashPos := strings.Index(path, "/")
-	if slashPos >= 0 {
-		endpointID = path[0:slashPos]
-		path = path[slashPos:]
-	} else {
-		endpointID = path
-		path = ""
-	}
-
-	h.lock.Lock()
-	e := h.endpoints[endpointID]
-	h.lock.Unlock()
-	if e == nil {
-		h.logger.Printf("Received request for unrecognized endpoint %s", req.URL.Path)
-		w.WriteHeader(404)
-		return
-	}
-
-	var body []byte
-	if req.Body != nil {
-		data, err := ioutil.ReadAll(req.Body)
-		req.Body.Close()
-		if err != nil {
-			h.logger.Printf("Unexpected error trying to read request body: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		body = data
-	}
-
-	e.lock.Lock()
-	ctx, canceller := context.WithCancel(req.Context())
-	cancellerPtr := &canceller
-	e.cancels = append(e.cancels, cancellerPtr)
-	e.lock.Unlock()
-
-	incoming := IncomingRequestInfo{
-		Headers: req.Header,
-		Method:  req.Method,
-		Body:    body,
-		Context: ctx,
-	}
-	select { // non-blocking push
-	case e.newConns <- incoming:
-		break
-	default:
-		h.logger.Printf("Incoming connection channel was full for %s", req.URL)
-	}
-
-	transformedReq := req.WithContext(ctx)
-	url := *req.URL
-	url.Path = path
-	transformedReq.URL = &url
-	if body != nil {
-		transformedReq.Body = ioutil.NopCloser(bytes.NewBuffer(body))
-	}
-
-	e.handler.ServeHTTP(w, transformedReq)
-
-	e.lock.Lock()
-	for i, c := range e.cancels {
-		if c == cancellerPtr { // can't compare functions with ==, but can compare pointers
-			e.cancels = append(e.cancels[:i], e.cancels[i+1:]...)
-			break
-		}
-	}
-	e.lock.Unlock()
+	h.mockEndpoints.serveHTTP(w, r)
 }
 
 func startServer(port int, handler http.Handler) error {

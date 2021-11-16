@@ -6,13 +6,16 @@ GOLANGCI_LINT_VERSION=v1.27.0
 LINTER=./bin/golangci-lint
 LINTER_VERSION_FILE=./bin/.golangci-lint-version-$(GOLANGCI_LINT_VERSION)
 
-.PHONY: build clean lint build-release publish-release docker-build docker-push docker-smoke-test
+.PHONY: build clean test lint build-release publish-release docker-build docker-push docker-smoke-test
 
 build:
 	go build
 
 clean:
 	go clean
+
+test:
+	go test ./...
 
 $(LINTER_VERSION_FILE):
 	rm -f $(LINTER)

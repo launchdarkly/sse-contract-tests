@@ -6,15 +6,17 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/launchdarkly/sse-contract-tests/framework"
 )
 
 type callbackReceiver struct {
-	endpoint *framework.MockEndpoint
-	logger   framework.Logger
-	output   chan entityOutput
+	endpoint       *framework.MockEndpoint
+	output         chan entityOutput
+	sortedMessages *framework.MessageSortingQueue
+	logger         framework.Logger
 }
 
 type entityOutput struct {
@@ -58,10 +60,12 @@ func (e EventMessage) String() string {
 
 func newCallbackReceiver(harness *framework.TestHarness, logger framework.Logger) *callbackReceiver {
 	c := &callbackReceiver{
-		logger: logger,
-		output: make(chan entityOutput, 1000),
+		output:         make(chan entityOutput, 100),
+		sortedMessages: framework.NewMessageSortingQueue(100),
+		logger:         logger,
 	}
-	c.endpoint = harness.NewMockEndpoint(c, logger)
+	c.endpoint = harness.NewMockEndpoint(c, nil, logger)
+	go c.consumeMessages()
 	return c
 }
 
@@ -78,15 +82,29 @@ func (c *callbackReceiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	message := ReceivedMessage{raw: string(data)}
-	c.logger.Printf("Received: %s", string(data))
-	if err := json.Unmarshal(data, &message); err != nil {
-		c.sendError(fmt.Errorf("malformed JSON data from test service: %s", message.raw))
-		w.WriteHeader(http.StatusBadRequest)
-		return
+
+	if r.URL.Path != "" || r.URL.Path == "/" {
+		counter, err := strconv.Atoi(r.URL.Path[1:])
+		if err == nil {
+			c.sortedMessages.Accept(counter, data)
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
 	}
-	c.output <- entityOutput{message: message}
-	w.WriteHeader(http.StatusAccepted)
+	c.sendError(fmt.Errorf("callback request had invalid path %q", r.URL.Path))
+	w.WriteHeader(http.StatusBadRequest)
+}
+
+func (c *callbackReceiver) consumeMessages() {
+	for data := range c.sortedMessages.C {
+		message := ReceivedMessage{raw: string(data)}
+		if err := json.Unmarshal(data, &message); err != nil {
+			c.sendError(fmt.Errorf("malformed JSON data from test service: %s", message.raw))
+			continue
+		}
+		c.logger.Printf("Received: %s", string(data))
+		c.output <- entityOutput{message: message}
+	}
 }
 
 func (c *callbackReceiver) sendError(err error) {
@@ -96,6 +114,7 @@ func (c *callbackReceiver) sendError(err error) {
 
 func (c *callbackReceiver) Close() {
 	c.endpoint.Close()
+	c.sortedMessages.Close()
 }
 
 // AwaitMessage waits until the test service sends a message.

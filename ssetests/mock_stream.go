@@ -1,6 +1,7 @@
 package ssetests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"sync"
@@ -9,6 +10,8 @@ import (
 	"github.com/launchdarkly/sse-contract-tests/framework"
 )
 
+const dataContextKey = "mockStream"
+
 // mockStream is a mock SSE service attached to one of the test harness's mock endpoints.
 // It gives the test logic a way to inject stream data that will be served up by the endpoint.
 // It is not a multiplexing SSE server-- any data injected by the test logic will only go to
@@ -16,7 +19,6 @@ import (
 type mockStream struct {
 	endpoint *framework.MockEndpoint
 	logger   framework.Logger
-	dataCh   chan streamChunk
 	lock     sync.Mutex
 }
 
@@ -30,16 +32,25 @@ func newMockStream(
 	logger framework.Logger,
 ) *mockStream {
 	s := &mockStream{
-		dataCh: make(chan streamChunk, 1000),
 		logger: logger,
 	}
 	streamLogger := framework.LoggerWithPrefix(logger, "[mock stream] ")
-	s.endpoint = harness.NewMockEndpoint(s, streamLogger)
+	s.endpoint = harness.NewMockEndpoint(
+		s,
+		func(ctx context.Context) context.Context {
+			dataCh := make(chan streamChunk, 1000)
+			return context.WithValue(ctx, dataContextKey, dataCh)
+		},
+		streamLogger,
+	)
 	return s
 }
 
 func (s *mockStream) Close() {
-	close(s.dataCh)
+	dataCh := s.getActiveDataChannel()
+	if dataCh != nil {
+		close(dataCh)
+	}
 	s.endpoint.Close()
 }
 
@@ -70,14 +81,23 @@ func (s *mockStream) SendSplit(data string, chunkSize int, delayBetween time.Dur
 	}
 }
 
+func (s *mockStream) getActiveDataChannel() chan streamChunk {
+	cxn := s.endpoint.ActiveConnection()
+	if cxn == nil || cxn.Context == nil {
+		return nil
+	}
+	value := cxn.Context.Value(dataContextKey)
+	if value == nil {
+		return nil
+	}
+	return value.(chan streamChunk)
+}
+
 func (s *mockStream) send(chunk streamChunk) {
-	// Grab the channel under a lock because if a new connection arrives, we will replace
-	// the channel with a new channel. That ensures that the test data is only ever going
-	// to one connection at a time.
-	s.lock.Lock()
-	ch := s.dataCh
-	s.lock.Unlock()
-	ch <- chunk
+	dataCh := s.getActiveDataChannel()
+	if dataCh != nil {
+		dataCh <- chunk
+	}
 }
 
 // Interrupt closes the current connection.
@@ -94,9 +114,7 @@ func (s *mockStream) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	flusher.Flush()
 
-	s.lock.Lock() // see comment on send()
-	ch := s.dataCh
-	s.lock.Unlock()
+	ch := s.getActiveDataChannel()
 
 Loop:
 	for {

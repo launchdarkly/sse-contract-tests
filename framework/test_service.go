@@ -25,10 +25,6 @@ type TestServiceEntity struct {
 	logger      Logger
 }
 
-type commandRequestParams struct {
-	Command string `json:"command"`
-}
-
 func queryTestServiceInfo(url string, timeout time.Duration, output io.Writer) (TestServiceInfo, error) {
 	fmt.Fprintf(output, "Connecting to test service at %s", url)
 
