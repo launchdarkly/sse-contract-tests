@@ -74,7 +74,7 @@ The test harness sends this request at the end of a test run if you have specifi
 A `POST` request indicates that the test harness wants to start an instance of the SSE client. The request body is a JSON object with the following properties. All of the properties except `streamUrl` and `callbackUrl` are optional.
 
 * `streamUrl`: The URL of an SSE endpoint created by the test harness.
-* `callbackUrl`: The URL of a callback endpoint created by the test harness (see "Callback endpoint" below).
+* `callbackUrl`: The base URL of a callback endpoint created by the test harness (see "Callback endpoint" below).
 * `tag`: A string describing the current test, if desired for logging.
 * `initialDelayMs`: An optional integer specifying the initial reconnection delay parameter, in milliseconds. Not all SSE client implementations allow this to be configured, but the test harness will send a value anyway in an attempt to avoid having reconnection tests run unnecessarily slowly.
 * `lastEventId`: An optional string which should be sent as the `Last-Event-Id` header in the initial HTTP request. The test harness will only set this property if the test service has the `"last-event-id"` capability.
@@ -105,7 +105,11 @@ Return any HTTP `2xx` status, or `404` if there is no such stream.
 
 ## Callback endpoint
 
-When the test harness tells the test service to create a stream, it provides a callback URL that is specific to that stream. The test service should make `POST` requests to this URL to deliver information about the status of the stream. The request body is always a JSON object, which can be one of the following:
+When the test harness tells the test service to create a stream, it provides a callback URL that is specific to that stream. The test service will use this to deliver information about the status of the stream via POST requests.
+
+To avoid race conditions where the test harness might process messages asynchronously in the wrong order, the test service must maintain a callback message counter for each stream, starting at 1 for the first callback it sends. Add this to the URL path: for instance, if the base callback URL is `http://testservice:8111/endpoints/99`, callbacks should be sent to `http://testservice:8111/endpoints/99/1`, `http://testservice:8111/endpoints/99/2`, etc.
+
+The request body is always a JSON object, which can be one of the following:
 
 #### `event` message
 
