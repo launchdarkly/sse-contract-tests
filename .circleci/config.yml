@@ -13,7 +13,7 @@ jobs:
       - image: cimg/go:1.17
     steps:
       - checkout
-      - make test
+      - run: make test
 
   docker-build-and-smoke-test:
     docker:
