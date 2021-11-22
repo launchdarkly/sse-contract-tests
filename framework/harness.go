@@ -20,9 +20,9 @@ type TestHarness struct {
 	lock                       sync.Mutex
 }
 
-// NewTestServiceClient creates a TestServiceClient instance, and verifies that the test service
-// is responding by querying its status resource. It also starts an HTTP listener on the specified
-// port to receive callback requests.
+// NewTestHarness creates a TestHarness instance, and verifies that the test service
+// is responding by querying its status resource. It also starts an HTTP listener
+// on the specified port to receive callback requests.
 func NewTestHarness(
 	testServiceBaseURL string,
 	testHarnessExternalHostname string,
