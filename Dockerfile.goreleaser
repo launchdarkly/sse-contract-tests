@@ -1,0 +1,8 @@
+# This Dockerfile is used by Goreleaser after it has already built the release binary.
+
+FROM alpine:3.14
+
+COPY sse-contract-tests /testharness/sse-contract-tests
+
+EXPOSE 8111
+ENTRYPOINT [ "/testharness/sse-contract-tests" ]
