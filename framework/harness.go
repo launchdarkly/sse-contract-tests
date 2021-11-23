@@ -70,7 +70,7 @@ func (h *TestHarness) TestServiceHasCapability(desired string) bool {
 	return false
 }
 
-// NewEndpoint adds a new endpoint that can receive requests.
+// NewMockEndpoint adds a new endpoint that can receive requests.
 //
 // The specified handler will be called for all incoming requests to the endpoint's
 // base URL or any subpath of it. For instance, if the generated base URL (as reported
