@@ -114,7 +114,10 @@ func DoBasicParsingTests(t *T) {
 
 	// The following test is based on one that's in the js-eventsource unit tests. While it works there,
 	// it does not (cannot?) work in Ruby, and possibly some other platforms where there's no native
-	// "non-string binary data" type. If that's true, we should probably delete this.
+	// "non-string binary data" type. On such platforms, the pieces of data being read from the stream
+	// are represented as strings, and any multi-byte character in a string must be complete or the
+	// string is invalid, so breaking a multi-byte character into pieces like this would cause an error.
+	// If that's true, we should probably delete this.
 	// t.Run("multi-byte characters sent in single-byte pieces", func(t *T) {
 	// 	   t.StartSSEClient()
 	//     t.SendSplit("data: €豆腐\n\n", 1, time.Millisecond*20)
