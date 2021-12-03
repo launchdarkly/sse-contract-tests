@@ -29,6 +29,13 @@ func DoLinefeedTests(t *T) {
 
 	testWithTerminator := func(terminator string) func(t *T) {
 		return func(t *T) {
+			t.Run("one-line event", testInputParsing(
+				"data: event 1"+terminator+terminator,
+				[]EventMessage{
+					{Data: "event 1"},
+				},
+			))
+
 			t.Run("one-line event + two-line event", testInputParsing(
 				"data: event 1"+terminator+terminator+
 					"data: event 2 line 1"+terminator+
