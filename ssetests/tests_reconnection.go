@@ -119,4 +119,33 @@ func DoReconnectionTests(t *T) {
 
 		t.AwaitNewConnectionToStream()
 	})
+
+	t.Run("can set modify retry delay", func(t *T) {
+		t.RequireCapability("retry")
+
+		opts := CreateStreamOpts{
+			InitialDelayMS: ldvalue.NewOptionalInt(0),
+		}
+		t.StartSSEClientOptions(opts)
+
+		t.SendOnStream("data: Hello\n\n")
+		t.RequireSpecificEvents(EventMessage{Data: "Hello"})
+
+		t.BreakStreamConnection()
+
+		start := time.Now()
+		t.AwaitNewConnectionToStream()
+		assert.Less(t, time.Since(start).Milliseconds(), int64(200))
+
+		t.RequireError()
+
+		t.SendOnStream("data: Hello\nretry: 500\n\n")
+		t.RequireSpecificEvents(EventMessage{Data: "Hello"})
+
+		t.BreakStreamConnection()
+
+		start = time.Now()
+		t.AwaitNewConnectionToStream()
+		assert.GreaterOrEqual(t, time.Since(start).Milliseconds(), int64(400))
+	})
 }

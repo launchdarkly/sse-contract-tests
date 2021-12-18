@@ -20,6 +20,7 @@ var AllCapabilities = []string{
 	"last-event-id",
 	"post",
 	"read-timeout",
+	"retry",
 	"report",
 }
 

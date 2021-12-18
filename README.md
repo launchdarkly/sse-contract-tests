@@ -60,6 +60,7 @@ This resource should return a 200 status to indicate that the service has starte
   * `"last-event-id"`: The SSE client can be configured to send a specific `Last-Event-Id` value in its initial HTTP request.
   * `"post"`: The SSE client can be configured to send a `POST` request with a body instead of a `GET`.
   * `"read-timeout"`: The SSE client can be configured with a specific read timeout (a.k.a. socket timeout).
+  * `"retry"`: The SSE client will update its reconnection delay based off the retry field in an SSE event.
   * `"report"`: The SSE client can be configured to send a `REPORT` request with a body instead of a `GET`.
   * `"restart"`: The caller can tell the SSE client at any time to disconnect and retry.
 
