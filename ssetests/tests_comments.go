@@ -9,7 +9,7 @@ func DoCommentTests(t *T) {
 
 	t.Run("single comment", func(t *T) {
 		t.StartSSEClient()
-		t.SendOnStream(":Hello\n")
+		t.SendOnStream(":Hello\n\n")
 		c := t.RequireComment()
 		assert.Equal(t, "Hello", c)
 	})
@@ -17,11 +17,11 @@ func DoCommentTests(t *T) {
 	t.Run("two comments in a row", func(t *T) {
 		t.StartSSEClient()
 
-		t.SendOnStream(":Hello\n")
+		t.SendOnStream(":Hello\n\n")
 		c1 := t.RequireComment()
 		assert.Equal(t, "Hello", c1)
 
-		t.SendOnStream(":World\n")
+		t.SendOnStream(":World\n\n")
 		c2 := t.RequireComment()
 		assert.Equal(t, "World", c2)
 	})
@@ -29,7 +29,7 @@ func DoCommentTests(t *T) {
 	t.Run("comment before event", func(t *T) {
 		t.StartSSEClient()
 
-		t.SendOnStream(":Hello\n")
+		t.SendOnStream(":Hello\n\n")
 		t.SendOnStream("data: Hello\n\n")
 
 		c := t.RequireComment()
@@ -44,7 +44,7 @@ func DoCommentTests(t *T) {
 		t.StartSSEClient()
 
 		t.SendOnStream("data: Hello\n\n")
-		t.SendOnStream(":Hello\n")
+		t.SendOnStream(":Hello\n\n")
 
 		ev := t.RequireEvent()
 		assert.Equal(t, "message", ev.Type)
