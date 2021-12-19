@@ -1,4 +1,4 @@
-package framework
+package ldtest
 
 import (
 	"fmt"
@@ -11,21 +11,22 @@ type Results struct {
 }
 
 type TestResult struct {
-	TestID  TestID
-	Errors  []error
-	Skipped bool
+	TestID TestID
+	Errors []error
 }
 
 func (r Results) OK() bool {
 	return len(r.Failures) == 0
 }
 
-type TestID struct {
-	Path []string
-}
+type TestID []string
 
 func (t TestID) String() string {
-	return strings.Join(t.Path, "/")
+	return strings.Join(t, "/")
+}
+
+func (t TestID) Plus(name string) TestID {
+	return append(append(TestID(nil), t...), name)
 }
 
 type TestFailure struct {

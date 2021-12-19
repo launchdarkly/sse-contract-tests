@@ -2,33 +2,35 @@ package ssetests
 
 import (
 	"time"
+
+	"github.com/launchdarkly/sse-contract-tests/framework/ldtest"
 )
 
-func DoLinefeedTests(t *T) {
-	testInputParsing := func(input string, expectedEvents []EventMessage) func(t *T) {
-		return func(t *T) {
-			t.Run("one chunk", func(t *T) {
-				t.StartSSEClient()
-				t.SendOnStream(input)
-				t.RequireSpecificEvents(expectedEvents...)
+func DoLinefeedTests(t *ldtest.T) {
+	testInputParsing := func(input string, expectedEvents []EventMessage) func(t *ldtest.T) {
+		return func(t *ldtest.T) {
+			t.Run("one chunk", func(t *ldtest.T) {
+				_, stream, client := NewStreamAndSSEClient(t)
+				stream.Send(input)
+				client.RequireSpecificEvents(t, expectedEvents...)
 			})
 
-			t.Run("1-character chunks", func(t *T) {
-				t.StartSSEClient()
-				t.SendOnStreamInChunks(input, 1, time.Millisecond*10)
-				t.RequireSpecificEvents(expectedEvents...)
+			t.Run("1-character chunks", func(t *ldtest.T) {
+				_, stream, client := NewStreamAndSSEClient(t)
+				stream.SendInChunks(input, 1, time.Millisecond*10)
+				client.RequireSpecificEvents(t, expectedEvents...)
 			})
 
-			t.Run("2-character chunks", func(t *T) {
-				t.StartSSEClient()
-				t.SendOnStreamInChunks(input, 2, time.Millisecond*10)
-				t.RequireSpecificEvents(expectedEvents...)
+			t.Run("2-character chunks", func(t *ldtest.T) {
+				_, stream, client := NewStreamAndSSEClient(t)
+				stream.SendInChunks(input, 2, time.Millisecond*10)
+				client.RequireSpecificEvents(t, expectedEvents...)
 			})
 		}
 	}
 
-	testWithTerminator := func(terminator string) func(t *T) {
-		return func(t *T) {
+	testWithTerminator := func(terminator string) func(t *ldtest.T) {
+		return func(t *ldtest.T) {
 			t.Run("one-line event", testInputParsing(
 				"data: event 1"+terminator+terminator,
 				[]EventMessage{
@@ -86,15 +88,15 @@ func DoLinefeedTests(t *T) {
 
 	t.Run("CR separator", testWithTerminator("\r"))
 
-	t.Run("CRLF where CR is end of 1 chunk", func(t *T) {
-		t.StartSSEClient()
-		t.SendOnStream("data: Hello\r")
-		t.SendOnStream("\ndata: World\r")
-		t.SendOnStream("\n\r\ndata: OK\r")
-		t.SendOnStream("\n")
-		t.SendOnStream("\r")
-		t.SendOnStream("\n")
-		t.RequireSpecificEvents(
+	t.Run("CRLF where CR is end of 1 chunk", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.Send("data: Hello\r")
+		stream.Send("\ndata: World\r")
+		stream.Send("\n\r\ndata: OK\r")
+		stream.Send("\n")
+		stream.Send("\r")
+		stream.Send("\n")
+		client.RequireSpecificEvents(t,
 			EventMessage{Data: "Hello\nWorld"},
 			EventMessage{Data: "OK"},
 		)

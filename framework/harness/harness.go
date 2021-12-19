@@ -1,23 +1,31 @@
-package framework
+package harness
 
 import (
 	"context"
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
 	"time"
+
+	"github.com/launchdarkly/sse-contract-tests/framework"
 )
 
 const httpListenerTimeout = time.Second * 10
 
+// TestHarness is the main component that manages communication with test services.
+//
+// It always communicates with a single test service, which it verifies is alive on startup. It
+// can then create any number of test service entities within the test service (NewTestServiceEntity)
+// and any number of callback endpoints for the test service to interact with (NewMockEndpoint).
+//
+// It contains no domain-specific test logic, but only provides a general mechanism for test suites
+// to build on.
 type TestHarness struct {
 	testServiceBaseURL         string
 	testHarnessExternalBaseURL string
 	testServiceInfo            TestServiceInfo
 	mockEndpoints              *mockEndpointsManager
-	logger                     Logger
-	lock                       sync.Mutex
+	logger                     framework.Logger
 }
 
 // NewTestHarness creates a TestHarness instance, and verifies that the test service
@@ -28,11 +36,11 @@ func NewTestHarness(
 	testHarnessExternalHostname string,
 	testHarnessPort int,
 	statusQueryTimeout time.Duration,
-	debugLogger Logger,
+	debugLogger framework.Logger,
 	startupOutput io.Writer,
 ) (*TestHarness, error) {
 	if debugLogger == nil {
-		debugLogger = NullLogger()
+		debugLogger = framework.NullLogger()
 	}
 
 	externalBaseURL := fmt.Sprintf("http://%s:%d", testHarnessExternalHostname, testHarnessPort)
@@ -57,17 +65,9 @@ func NewTestHarness(
 	return h, nil
 }
 
+// TestServiceInfo returns the initial status information received from the test service.
 func (h *TestHarness) TestServiceInfo() TestServiceInfo {
 	return h.testServiceInfo
-}
-
-func (h *TestHarness) TestServiceHasCapability(desired string) bool {
-	for _, capability := range h.testServiceInfo.Capabilities {
-		if capability == desired {
-			return true
-		}
-	}
-	return false
 }
 
 // NewMockEndpoint adds a new endpoint that can receive requests.
@@ -83,7 +83,7 @@ func (h *TestHarness) TestServiceHasCapability(desired string) bool {
 func (h *TestHarness) NewMockEndpoint(
 	handler http.Handler,
 	contextFn func(context.Context) context.Context,
-	logger Logger,
+	logger framework.Logger,
 ) *MockEndpoint {
 	if logger == nil {
 		logger = h.logger
@@ -124,9 +124,12 @@ func startServer(port int, handler http.Handler) error {
 	for {
 		select {
 		case <-deadline.C:
-			return fmt.Errorf("Could not detect own listener at %s", server.Addr)
+			return fmt.Errorf("could not detect own listener at %s", server.Addr)
 		case <-ticker.C:
 			resp, err := http.DefaultClient.Head(fmt.Sprintf("http://localhost:%d", port))
+			if resp.Body != nil {
+				_ = resp.Body.Close()
+			}
 			if err == nil && resp.StatusCode == 200 {
 				return nil
 			}

@@ -1,17 +1,34 @@
 package ssetests
 
 import (
-	"github.com/launchdarkly/sse-contract-tests/framework"
+	"github.com/launchdarkly/sse-contract-tests/framework/harness"
+	"github.com/launchdarkly/sse-contract-tests/framework/ldtest"
 )
 
-func RunTestSuite(
-	harness *framework.TestHarness,
-	filter framework.Filter,
-	testLogger framework.TestLogger,
-) framework.Results {
-	return framework.Run(filter, testLogger, func(c *framework.Context) {
-		t := newTestScope(c, harness)
+var AllCapabilities = []string{ //nolint:gochecknoglobals
+	"comments",
+	"headers",
+	"last-event-id",
+	"post",
+	"read-timeout",
+	"report",
+}
 
+func RunTestSuite(
+	harness *harness.TestHarness,
+	filter ldtest.Filter,
+	testLogger ldtest.TestLogger,
+) ldtest.Results {
+	config := ldtest.TestConfiguration{
+		Filter:       filter,
+		Capabilities: harness.TestServiceInfo().Capabilities,
+		TestLogger:   testLogger,
+		Context: SSETestContext{
+			harness: harness,
+		},
+	}
+
+	return ldtest.Run(config, func(t *ldtest.T) {
 		t.Run("basic parsing", DoBasicParsingTests)
 		t.Run("comments", DoCommentTests)
 		t.Run("linefeeds", DoLinefeedTests)
