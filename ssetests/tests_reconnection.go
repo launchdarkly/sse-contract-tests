@@ -119,4 +119,21 @@ func DoReconnectionTests(t *T) {
 
 		t.AwaitNewConnectionToStream()
 	})
+
+	t.Run("discards partial messages on retry", func(t *T) {
+		opts := CreateStreamOpts{
+			InitialDelayMS: ldvalue.NewOptionalInt(0),
+		}
+		_ = t.StartSSEClientOptions(opts)
+
+		t.SendOnStream("id: abc\ndata: Hello\n\nid: def\ndata: Goodbye")
+		t.RequireSpecificEvents(EventMessage{ID: "abc", Data: "Hello"})
+
+		t.BreakStreamConnection()
+		t.RequireError()
+
+		t.AwaitNewConnectionToStream()
+		t.SendOnStream("data: We meet again\n\n")
+		t.RequireSpecificEvents(EventMessage{Data: "We meet again"})
+	})
 }
