@@ -1,0 +1,7 @@
+# Purpose and overview
+
+Implementations of the [Server-Sent Events](https://en.wikipedia.org/wiki/Server-sent_events) protocol must be able to handle many variations of data ordering, network behavior, etc. Providing thorough test coverage of these can be tedious, and it is easy to make subtle implementation mistakes.
+
+SSE is used in core components of LaunchDarkly services and SDKs, so it is highly desirable for all SSE implementations used by LaunchDarkly to be rigorously tested-- and it is much easier to test all of the SSE protocol edge cases directly against the SSE client, rather than indirectly through the SDKs. Also, while LaunchDarkly does not use every feature of SSE, we publish these implementations as open-source libraries which developers may use for their own purposes, so we want to guarantee that there are no implementation mistakes even if they do not affect our own usage.
+
+This project provides a test harness mechanism for running a standardized test suite against any SSE implementation. To use this tool, you must first implement a small web service that exercises the features of your SSE implementation. The behavior of the service endpoints is described in [SSE test service specification](./service_spec). After starting the service, run the test harness and give it the base URL of the test service. The test harness will start its own HTTP server to provide SSE data, which it will then ask the test service to connect to and read from.
