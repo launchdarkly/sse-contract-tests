@@ -65,6 +65,32 @@ func DoBasicParsingTests(t *T) {
 		t.RequireSpecificEvents(EventMessage{Type: "greeting", ID: "abc", Data: "Hello"})
 	})
 
+	t.Run("ID field is ignored if it contains a null", func(t *T) {
+		t.StartSSEClient()
+		t.SendOnStream("id: a\x00bc\ndata: Hello\n\n")
+		t.RequireSpecificEvents(EventMessage{Data: "Hello"})
+	})
+
+	t.Run("last ID persists if not overridden by later event", func(t *T) {
+		t.StartSSEClient()
+		t.SendOnStream("id: abc\ndata: first\n\n")
+		t.SendOnStream("data: second\n\n")
+		t.RequireSpecificEvents(
+			EventMessage{ID: "abc", Data: "first"},
+			EventMessage{ID: "abc", Data: "second"},
+		)
+	})
+
+	t.Run("last ID can be overridden by an empty value", func(t *T) {
+		t.StartSSEClient()
+		t.SendOnStream("id: abc\ndata: first\n\n")
+		t.SendOnStream("id: \ndata: second\n\n")
+		t.RequireSpecificEvents(
+			EventMessage{ID: "abc", Data: "first"},
+			EventMessage{Data: "second"},
+		)
+	})
+
 	t.Run("fields in reverse order", func(t *T) {
 		t.StartSSEClient()
 		t.TellClientToExpectEventType("greeting")
