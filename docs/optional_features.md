@@ -14,6 +14,8 @@ In the SSE specification, a "comment" is defined as a line of text that begins w
 
 If this capability is enabled, the test harness will expect to receive a `"comment"` callback message whenever the client has read a comment line (regardless of whether it has parsed an event). The comment text in the message should not include the leading colon.
 
+Note that the syntax rules in SSE specification show "comment" as part of an "event" block, and "event" is always terminated by two line endings. But, since the core spec does not define any action at all to be taken for comments, that does not mean a client with this capability needs to wait for a double line break before reporting a comment. It simply means that syntactically, any number of comment lines _can_ appear wherever an event field could appear, and that the client should not report an event until it has fully parsed an event.
+
 ## Type-specific listeners (capability: `"event-type-listeners"`)
 
 This means that the SSE client's API requires the caller to explicitly listen for any event type that is not the default `"message"`.
