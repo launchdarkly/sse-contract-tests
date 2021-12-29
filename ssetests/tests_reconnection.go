@@ -75,6 +75,28 @@ func DoReconnectionTests(t *T) {
 		assert.Equal(t, "abc", cxn2.Headers.Get("Last-Event-Id"), "reconnection request did not send expected Last-Event-Id")
 	})
 
+	t.Run("does not send Last-Event-Id header if value is an empty string", func(t *T) {
+		opts := CreateStreamOpts{
+			InitialDelayMS: ldvalue.NewOptionalInt(0),
+		}
+		cxn1 := t.StartSSEClientOptions(opts)
+
+		assert.Empty(t, cxn1.Headers.Values("Last-Event-Id"))
+
+		t.SendOnStream("id:\ndata: Hello\n\n")
+
+		t.RequireSpecificEvents(EventMessage{Data: "Hello"})
+
+		t.BreakStreamConnection()
+
+		cxn2 := t.AwaitNewConnectionToStream()
+
+		_, ok := cxn2.Headers["Last-Event-Id"]
+		assert.False(t, ok,
+			"reconnection request should not have sent a Last-Event-Id header, but did (value was %q)",
+			cxn2.Headers.Get("Last-Event-Id"))
+	})
+
 	t.Run("resends request body if any when reconnecting", func(t *T) {
 		t.RequireCapability("post")
 
