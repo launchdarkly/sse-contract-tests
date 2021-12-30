@@ -68,9 +68,6 @@ func DoReconnectionTests(t *ldtest.T) {
 
 		e2 := client.RequireEvent(t)
 		assert.Equal(t, "World", e2.Data)
-		if e2.ID != "" {
-			assert.Equal(t, "abc", e2.ID)
-		}
 
 		stream1.BreakConnection()
 
@@ -78,6 +75,35 @@ func DoReconnectionTests(t *ldtest.T) {
 
 		assert.Equal(t, "abc", stream2.RequestInfo.Headers.Get("Last-Event-Id"),
 			"reconnection request did not send expected Last-Event-Id")
+	})
+
+	t.Run("last event ID can be explicitly overridden with an empty value", func(t *ldtest.T) {
+		params := servicedef.CreateStreamParams{
+			InitialDelayMS: ldvalue.NewOptionalInt(0),
+		}
+		server, stream1, client := NewStreamAndSSEClient(t, WithClientParams(params))
+
+		assert.Empty(t, stream1.RequestInfo.Headers.Values("Last-Event-Id"))
+
+		stream1.Send("id: abc\ndata: Hello\n\n")
+		stream1.Send("id: \ndata: World\n\n")
+
+		e1 := client.RequireEvent(t)
+		assert.Equal(t, "Hello", e1.Data)
+		assert.Equal(t, "abc", e1.ID)
+
+		e2 := client.RequireEvent(t)
+		assert.Equal(t, "World", e2.Data)
+		assert.Equal(t, "", e2.ID)
+
+		stream1.BreakConnection()
+
+		stream2 := server.AwaitConnection(t)
+
+		_, ok := stream2.RequestInfo.Headers["Last-Event-Id"]
+		assert.False(t, ok,
+			"reconnection request should not have sent a Last-Event-Id header, but did (value was %q)",
+			stream2.RequestInfo.Headers.Get("Last-Event-Id"))
 	})
 
 	t.Run("resends request body if any when reconnecting", func(t *ldtest.T) {
@@ -123,5 +149,29 @@ func DoReconnectionTests(t *ldtest.T) {
 		client.RequireError(t)
 
 		server.AwaitConnection(t)
+	})
+
+	t.Run("discards partial messages on retry", func(t *ldtest.T) {
+		params := servicedef.CreateStreamParams{
+			InitialDelayMS: ldvalue.NewOptionalInt(0),
+		}
+		server, stream1, client := NewStreamAndSSEClient(t, WithClientParams(params))
+
+		stream1.Send("id: abc\ndata: Hello\n\nid: def\ndata: Goodbye")
+		client.RequireSpecificEvents(t, EventMessage{ID: "abc", Data: "Hello"})
+
+		stream1.BreakConnection()
+		client.RequireError(t)
+
+		stream2 := server.AwaitConnection(t)
+		stream2.Send("data: We meet again\n\n")
+
+		e := client.RequireEvent(t)
+		assert.Equal(t, "We meet again", e.Data)
+		assert.NotEqual(t, "def", e.ID)
+		// The correct ID value here should be "abc", but we're not checking for that here because if the SSE
+		// client has a bug making it not correctly retain the last ID from a previous event, we already have
+		// a more specific test for that; we don't want it to cause a misleading failure in this test. We
+		// just want to prove that it did *not* pick up the "def" from the partial event.
 	})
 }
