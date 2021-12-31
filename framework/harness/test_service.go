@@ -1,4 +1,4 @@
-package framework
+package harness
 
 import (
 	"bytes"
@@ -10,19 +10,33 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/launchdarkly/sse-contract-tests/framework"
 )
 
 // TestServiceInfo is status information returned by the test service from the initial status query.
 type TestServiceInfo struct {
-	Description  string   `json:"description"`
-	Capabilities []string `json:"capabilities"`
+	TestServiceInfoBase
+
+	// FullData is the entire response received from the test service, which might contain additional
+	// properties beyond TestServiceInfoBase.
+	FullData []byte
+}
+
+// TestServiceInfoBase is the basic set of properties that all test services must provide.
+type TestServiceInfoBase struct {
+	// Name is the name of the project that the test service is testing, such as "go-server-sdk".
+	Name string `json:"name"`
+
+	// Capabilities is a list of strings representing optional features of the test service.
+	Capabilities framework.Capabilities `json:"capabilities"`
 }
 
 // TestServiceEntity represents some kind of entity that we have asked the test service to create,
 // which the test harness will interact with.
 type TestServiceEntity struct {
 	resourceURL string
-	logger      Logger
+	logger      framework.Logger
 }
 
 func queryTestServiceInfo(url string, timeout time.Duration, output io.Writer) (TestServiceInfo, error) {
@@ -42,16 +56,16 @@ func queryTestServiceInfo(url string, timeout time.Duration, output io.Writer) (
 				return TestServiceInfo{}, nil
 			}
 			respData, err := ioutil.ReadAll(resp.Body)
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if err != nil {
 				return TestServiceInfo{}, err
 			}
 			fmt.Fprintf(output, "Status query returned metadata: %s\n", string(respData))
-			var info TestServiceInfo
-			if err := json.Unmarshal(respData, &info); err != nil {
+			var base TestServiceInfoBase
+			if err := json.Unmarshal(respData, &base); err != nil {
 				return TestServiceInfo{}, fmt.Errorf("malformed status response from test service: %s", string(respData))
 			}
-			return info, nil
+			return TestServiceInfo{TestServiceInfoBase: base, FullData: respData}, nil
 		}
 		if !time.Now().Before(deadline) {
 			return TestServiceInfo{}, fmt.Errorf("timed out, result of last query was: %w", err)
@@ -64,6 +78,9 @@ func queryTestServiceInfo(url string, timeout time.Duration, output io.Writer) (
 func (h *TestHarness) StopService() error {
 	req, _ := http.NewRequest("DELETE", h.testServiceBaseURL, nil)
 	resp, err := http.DefaultClient.Do(req)
+	if resp != nil && resp.Body != nil {
+		_ = resp.Body.Close()
+	}
 	if err == nil && resp.StatusCode >= 300 {
 		return fmt.Errorf("service returned HTTP %d", resp.StatusCode)
 	}
@@ -81,10 +98,10 @@ func (h *TestHarness) StopService() error {
 func (h *TestHarness) NewTestServiceEntity(
 	entityParams interface{},
 	description string,
-	logger Logger,
+	logger framework.Logger,
 ) (*TestServiceEntity, error) {
 	if logger == nil {
-		logger = NullLogger()
+		logger = framework.NullLogger()
 	}
 
 	data, err := json.Marshal(entityParams)
@@ -108,7 +125,7 @@ func (h *TestHarness) NewTestServiceEntity(
 		if resp.Body != nil {
 			data, _ = ioutil.ReadAll(resp.Body)
 			message = ": " + string(data)
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 		return nil, fmt.Errorf("unexpected response status %d from test service%s", resp.StatusCode, message)
 	}
@@ -130,42 +147,74 @@ func (h *TestHarness) NewTestServiceEntity(
 
 // Close tells the test service to dispose of this entity.
 func (e *TestServiceEntity) Close() error {
-	req, err := http.NewRequest("DELETE", e.resourceURL, nil)
-	if err != nil {
-		return err
-	}
+	e.logger.Printf("Closing %s", e.resourceURL)
+	req, _ := http.NewRequest("DELETE", e.resourceURL, nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		e.logger.Printf("DELETE request to test service failed: %s", err)
 		return err
 	}
 	if resp.Body != nil {
 		_ = resp.Body.Close()
 	}
 	if resp.StatusCode != 200 && resp.StatusCode != 204 {
-		return fmt.Errorf("DELETE request to test service returned HTTP status %d", resp.StatusCode)
+		err := fmt.Errorf("DELETE request to test service returned HTTP status %d", resp.StatusCode)
+		e.logger.Println(err)
+		return err
 	}
 	return nil
 }
 
 // SendCommand sends a command to the test service entity.
-func (e *TestServiceEntity) SendCommand(command string, additionalParams ...map[string]interface{}) error {
-	allParams := map[string]interface{}{"command": command}
-	for _, p := range additionalParams {
-		for k, v := range p {
-			allParams[k] = v
-		}
+func (e *TestServiceEntity) SendCommand(
+	command string,
+	logger framework.Logger,
+	responseOut interface{},
+) error {
+	return e.SendCommandWithParams(
+		map[string]interface{}{"command": command},
+		logger,
+		responseOut,
+	)
+}
+
+// SendCommandWithParams sends a command to the test service entity.
+func (e *TestServiceEntity) SendCommandWithParams(
+	allParams interface{},
+	logger framework.Logger,
+	responseOut interface{},
+) error {
+	if logger == nil {
+		logger = e.logger
 	}
 	data, _ := json.Marshal(allParams)
-	e.logger.Printf("Sending command: %s", string(data))
+	logger.Printf("Sending command: %s", string(data))
 	resp, err := http.DefaultClient.Post(e.resourceURL, "application/json", bytes.NewBuffer(data))
 	if err != nil {
 		return err
 	}
+	var body []byte
 	if resp.Body != nil {
-		resp.Body.Close()
+		body, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		_ = resp.Body.Close()
 	}
 	if resp.StatusCode >= 300 {
-		return fmt.Errorf("command returned HTTP status %d", resp.StatusCode)
+		message := ""
+		if body != nil {
+			message = " (" + string(body) + ")"
+		}
+		return fmt.Errorf("command returned HTTP status %d%s", resp.StatusCode, message)
+	}
+	if responseOut != nil {
+		if body == nil {
+			return errors.New("expected a response body but got none")
+		}
+		if err = json.Unmarshal(body, responseOut); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -3,84 +3,115 @@ package ssetests
 import (
 	"time"
 
+	"github.com/launchdarkly/sse-contract-tests/framework/ldtest"
+	"github.com/launchdarkly/sse-contract-tests/servicedef"
+
 	"gopkg.in/launchdarkly/go-sdk-common.v2/ldvalue"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func DoReconnectionTests(t *T) {
-	t.Run("caller can trigger a restart", func(t *T) {
+func DoReconnectionTests(t *ldtest.T) {
+	t.Run("caller can trigger a restart", func(t *ldtest.T) {
 		t.RequireCapability("restart")
 
-		opts := CreateStreamOpts{
+		params := servicedef.CreateStreamParams{
 			InitialDelayMS: ldvalue.NewOptionalInt(0),
 		}
-		t.StartSSEClientOptions(opts)
+		server, stream1, client := NewStreamAndSSEClient(t, WithClientParams(params))
 
-		t.SendOnStream("data: Hello\n\n")
-		t.RequireSpecificEvents(EventMessage{Data: "Hello"})
+		stream1.Send("data: Hello\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Data: "Hello"})
 
-		t.RestartClient()
+		client.Restart(t)
 
-		t.AwaitNewConnectionToStream()
+		stream2 := server.AwaitConnection(t)
 
-		t.SendOnStream("data: Thanks\n\n")
-		t.RequireSpecificEvents(EventMessage{Data: "Thanks"})
+		stream2.Send("data: Thanks\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Data: "Thanks"})
 	})
 
-	t.Run("sends ID of last received event", func(t *T) {
-		opts := CreateStreamOpts{
+	t.Run("sends ID of last received event", func(t *ldtest.T) {
+		params := servicedef.CreateStreamParams{
 			InitialDelayMS: ldvalue.NewOptionalInt(0),
 		}
-		cxn1 := t.StartSSEClientOptions(opts)
+		server, stream1, client := NewStreamAndSSEClient(t, WithClientParams(params))
 
-		assert.Empty(t, cxn1.Headers.Values("Last-Event-Id"))
+		assert.Empty(t, stream1.RequestInfo.Headers.Values("Last-Event-Id"))
 
-		t.SendOnStream("id: abc\ndata: Hello\n\n")
+		stream1.Send("id: abc\ndata: Hello\n\n")
 
-		t.RequireSpecificEvents(EventMessage{ID: "abc", Data: "Hello"})
+		client.RequireSpecificEvents(t, EventMessage{ID: "abc", Data: "Hello"})
 
-		t.BreakStreamConnection()
+		stream1.BreakConnection()
 
-		cxn2 := t.AwaitNewConnectionToStream()
+		stream2 := server.AwaitConnection(t)
 
-		assert.Equal(t, "abc", cxn2.Headers.Get("Last-Event-Id"), "reconnection request did not send expected Last-Event-Id")
+		assert.Equal(t, "abc", stream2.RequestInfo.Headers.Get("Last-Event-Id"),
+			"reconnection request did not send expected Last-Event-Id")
 	})
 
-	t.Run("sends ID of last received event that had an ID if later events did not", func(t *T) {
-		opts := CreateStreamOpts{
+	t.Run("sends ID of last received event that had an ID if later events did not", func(t *ldtest.T) {
+		params := servicedef.CreateStreamParams{
 			InitialDelayMS: ldvalue.NewOptionalInt(0),
 		}
-		cxn1 := t.StartSSEClientOptions(opts)
+		server, stream1, client := NewStreamAndSSEClient(t, WithClientParams(params))
 
-		assert.Empty(t, cxn1.Headers.Values("Last-Event-Id"))
+		assert.Empty(t, stream1.RequestInfo.Headers.Values("Last-Event-Id"))
 
-		t.SendOnStream("id: abc\ndata: Hello\n\n")
-		t.SendOnStream("data: World\n\n")
+		stream1.Send("id: abc\ndata: Hello\n\n")
+		stream1.Send("data: World\n\n")
 
-		e1 := t.RequireEvent()
+		e1 := client.RequireEvent(t)
 		assert.Equal(t, "Hello", e1.Data)
 		assert.Equal(t, "abc", e1.ID)
 
-		e2 := t.RequireEvent()
+		e2 := client.RequireEvent(t)
 		assert.Equal(t, "World", e2.Data)
-		if e2.ID != "" {
-			assert.Equal(t, "abc", e2.ID)
-		}
 
-		t.BreakStreamConnection()
+		stream1.BreakConnection()
 
-		cxn2 := t.AwaitNewConnectionToStream()
+		stream2 := server.AwaitConnection(t)
 
-		assert.Equal(t, "abc", cxn2.Headers.Get("Last-Event-Id"), "reconnection request did not send expected Last-Event-Id")
+		assert.Equal(t, "abc", stream2.RequestInfo.Headers.Get("Last-Event-Id"),
+			"reconnection request did not send expected Last-Event-Id")
 	})
 
-	t.Run("resends request body if any when reconnecting", func(t *T) {
+	t.Run("last event ID can be explicitly overridden with an empty value", func(t *ldtest.T) {
+		params := servicedef.CreateStreamParams{
+			InitialDelayMS: ldvalue.NewOptionalInt(0),
+		}
+		server, stream1, client := NewStreamAndSSEClient(t, WithClientParams(params))
+
+		assert.Empty(t, stream1.RequestInfo.Headers.Values("Last-Event-Id"))
+
+		stream1.Send("id: abc\ndata: Hello\n\n")
+		stream1.Send("id: \ndata: World\n\n")
+
+		e1 := client.RequireEvent(t)
+		assert.Equal(t, "Hello", e1.Data)
+		assert.Equal(t, "abc", e1.ID)
+
+		e2 := client.RequireEvent(t)
+		assert.Equal(t, "World", e2.Data)
+		assert.Equal(t, "", e2.ID)
+
+		stream1.BreakConnection()
+
+		stream2 := server.AwaitConnection(t)
+
+		_, ok := stream2.RequestInfo.Headers["Last-Event-Id"]
+		assert.False(t, ok,
+			"reconnection request should not have sent a Last-Event-Id header, but did (value was %q)",
+			stream2.RequestInfo.Headers.Get("Last-Event-Id"))
+	})
+
+	t.Run("resends request body if any when reconnecting", func(t *ldtest.T) {
 		t.RequireCapability("post")
 
 		jsonBody := `{"hello": "world"}`
 
-		opts := CreateStreamOpts{
+		params := servicedef.CreateStreamParams{
 			Headers: map[string]string{
 				"content-type": "application/json; charset=utf-8",
 			},
@@ -88,64 +119,85 @@ func DoReconnectionTests(t *T) {
 			Method:         "POST",
 			Body:           jsonBody,
 		}
-		cxn1 := t.StartSSEClientOptions(opts)
+		server, stream1, _ := NewStreamAndSSEClient(t, WithClientParams(params))
 
-		assert.Equal(t, "POST", cxn1.Method)
-		assert.Equal(t, jsonBody, string(cxn1.Body))
+		assert.Equal(t, "POST", stream1.RequestInfo.Method)
+		assert.Equal(t, jsonBody, string(stream1.RequestInfo.Body))
 
-		t.BreakStreamConnection()
+		stream1.BreakConnection()
 
-		cxn2 := t.AwaitNewConnectionToStream()
+		stream2 := server.AwaitConnection(t)
 
-		assert.Equal(t, "POST", cxn2.Method)
-		assert.Equal(t, jsonBody, string(cxn2.Body))
+		assert.Equal(t, "POST", stream2.RequestInfo.Method)
+		assert.Equal(t, jsonBody, string(stream2.RequestInfo.Body))
 	})
 
-	t.Run("can set read timeout", func(t *T) {
+	t.Run("can set read timeout", func(t *ldtest.T) {
 		t.RequireCapability("read-timeout")
 
-		opts := CreateStreamOpts{
+		params := servicedef.CreateStreamParams{
 			InitialDelayMS: ldvalue.NewOptionalInt(0),
 			ReadTimeoutMS:  ldvalue.NewOptionalInt(500),
 		}
-		t.StartSSEClientOptions(opts)
+		server, stream, client := NewStreamAndSSEClient(t, WithClientParams(params))
 
-		t.SendOnStream("data: Hello\n\n")
+		stream.Send("data: Hello\n\n")
 		time.Sleep(time.Second)
 
-		t.RequireSpecificEvents(EventMessage{Data: "Hello"})
+		client.RequireSpecificEvents(t, EventMessage{Data: "Hello"})
 
-		t.RequireError()
+		client.RequireError(t)
 
-		t.AwaitNewConnectionToStream()
+		server.AwaitConnection(t)
 	})
 
-	t.Run("can set modify retry delay", func(t *T) {
-		t.RequireCapability("retry")
-
-		opts := CreateStreamOpts{
+	t.Run("discards partial messages on retry", func(t *ldtest.T) {
+		params := servicedef.CreateStreamParams{
 			InitialDelayMS: ldvalue.NewOptionalInt(0),
 		}
-		t.StartSSEClientOptions(opts)
+		server, stream1, client := NewStreamAndSSEClient(t, WithClientParams(params))
 
-		t.SendOnStream("data: Hello\n\n")
-		t.RequireSpecificEvents(EventMessage{Data: "Hello"})
+		stream1.Send("id: abc\ndata: Hello\n\nid: def\ndata: Goodbye")
+		client.RequireSpecificEvents(t, EventMessage{ID: "abc", Data: "Hello"})
 
-		t.BreakStreamConnection()
+		stream1.BreakConnection()
+
+		stream2 := server.AwaitConnection(t)
+		stream2.Send("data: We meet again\n\n")
+
+		e := client.RequireEvent(t)
+		assert.Equal(t, "We meet again", e.Data)
+		assert.NotEqual(t, "def", e.ID)
+		// The correct ID value here should be "abc", but we're not checking for that here because if the SSE
+		// client has a bug making it not correctly retain the last ID from a previous event, we already have
+		// a more specific test for that; we don't want it to cause a misleading failure in this test. We
+		// just want to prove that it did *not* pick up the "def" from the partial event.
+	})
+
+	t.Run("can set modify retry delay", func(t *ldtest.T) {
+		t.RequireCapability("retry")
+
+		params := servicedef.CreateStreamParams{
+			InitialDelayMS: ldvalue.NewOptionalInt(0),
+		}
+		server, stream1, client := NewStreamAndSSEClient(t, WithClientParams(params))
+
+		stream1.Send("data: Hello\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Data: "Hello"})
+
+		stream1.BreakConnection()
 
 		start := time.Now()
-		t.AwaitNewConnectionToStream()
+		stream2 := server.AwaitConnection(t)
 		assert.Less(t, time.Since(start).Milliseconds(), int64(200))
 
-		t.RequireError()
+		stream2.Send("data: Hello\nretry: 500\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Data: "Hello"})
 
-		t.SendOnStream("data: Hello\nretry: 500\n\n")
-		t.RequireSpecificEvents(EventMessage{Data: "Hello"})
-
-		t.BreakStreamConnection()
+		stream2.BreakConnection()
 
 		start = time.Now()
-		t.AwaitNewConnectionToStream()
+		_ = server.AwaitConnection(t)
 		assert.GreaterOrEqual(t, time.Since(start).Milliseconds(), int64(400))
 	})
 }

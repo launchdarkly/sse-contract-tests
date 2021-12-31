@@ -1,56 +1,58 @@
 package ssetests
 
 import (
+	"github.com/launchdarkly/sse-contract-tests/framework/ldtest"
+
 	"github.com/stretchr/testify/assert"
 )
 
-func DoCommentTests(t *T) {
+func DoCommentTests(t *ldtest.T) {
 	t.RequireCapability("comments")
 
-	t.Run("single comment", func(t *T) {
-		t.StartSSEClient()
-		t.SendOnStream(":Hello\n")
-		c := t.RequireComment()
+	t.Run("single comment", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.Send(":Hello\n")
+		c := client.RequireComment(t)
 		assert.Equal(t, "Hello", c)
 	})
 
-	t.Run("two comments in a row", func(t *T) {
-		t.StartSSEClient()
+	t.Run("two comments in a row", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
 
-		t.SendOnStream(":Hello\n")
-		c1 := t.RequireComment()
+		stream.Send(":Hello\n")
+		c1 := client.RequireComment(t)
 		assert.Equal(t, "Hello", c1)
 
-		t.SendOnStream(":World\n")
-		c2 := t.RequireComment()
+		stream.Send(":World\n")
+		c2 := client.RequireComment(t)
 		assert.Equal(t, "World", c2)
 	})
 
-	t.Run("comment before event", func(t *T) {
-		t.StartSSEClient()
+	t.Run("comment before event", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
 
-		t.SendOnStream(":Hello\n")
-		t.SendOnStream("data: Hello\n\n")
+		stream.Send(":Hello\n")
+		stream.Send("data: Hello\n\n")
 
-		c := t.RequireComment()
+		c := client.RequireComment(t)
 		assert.Equal(t, "Hello", c)
 
-		ev := t.RequireEvent()
+		ev := client.RequireEvent(t)
 		assert.Equal(t, "message", ev.Type)
 		assert.Equal(t, "Hello", ev.Data)
 	})
 
-	t.Run("comment after event", func(t *T) {
-		t.StartSSEClient()
+	t.Run("comment after event", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
 
-		t.SendOnStream("data: Hello\n\n")
-		t.SendOnStream(":Hello\n")
+		stream.Send("data: Hello\n\n")
+		stream.Send(":Hello\n")
 
-		ev := t.RequireEvent()
+		ev := client.RequireEvent(t)
 		assert.Equal(t, "message", ev.Type)
 		assert.Equal(t, "Hello", ev.Data)
 
-		c := t.RequireComment()
+		c := client.RequireComment(t)
 		assert.Equal(t, "Hello", c)
 	})
 }
