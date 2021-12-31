@@ -156,7 +156,6 @@ func DoReconnectionTests(t *T) {
 		t.RequireSpecificEvents(EventMessage{ID: "abc", Data: "Hello"})
 
 		t.BreakStreamConnection()
-		t.RequireError()
 
 		t.AwaitNewConnectionToStream()
 		t.SendOnStream("data: We meet again\n\n")
