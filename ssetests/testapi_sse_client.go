@@ -75,15 +75,14 @@ type clientParamsConfigurer servicedef.CreateStreamParams
 func NewSSEClient(t *ldtest.T, configurers ...SSEClientConfigurer) *SSEClient {
 	testHarness := requireContext(t).harness
 
-	params := servicedef.CreateStreamParams{
-		Tag: t.ID().String(),
-	}
+	params := servicedef.CreateStreamParams{}
 	for _, conf := range configurers {
 		conf.ApplyConfiguration(&params)
 	}
 	if params.StreamURL == "" {
 		require.Fail(t, "StreamURL was not set in stream parameters; did you forget to reference the StreamServer?")
 	}
+	params.Tag = t.ID().String()
 	c := &SSEClient{
 		outputCh:      make(chan messageOrError, 100),
 		callbackQueue: harness.NewMessageSortingQueue(100),
