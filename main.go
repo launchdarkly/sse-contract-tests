@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/launchdarkly/sse-contract-tests/framework"
+	"github.com/launchdarkly/sse-contract-tests/framework/harness"
+	"github.com/launchdarkly/sse-contract-tests/framework/ldtest"
 	"github.com/launchdarkly/sse-contract-tests/ssetests"
 )
 
@@ -36,7 +38,7 @@ func main() {
 		mainDebugLogger = log.New(os.Stdout, "", log.LstdFlags)
 	}
 
-	harness, err := framework.NewTestHarness(
+	harness, err := harness.NewTestHarness(
 		params.serviceURL,
 		params.host,
 		params.port,
@@ -50,19 +52,19 @@ func main() {
 	}
 
 	fmt.Println()
-	framework.PrintFilterDescription(harness, params.filters, ssetests.AllCapabilities)
+	ldtest.PrintFilterDescription(params.filters, ssetests.AllCapabilities, harness.TestServiceInfo().Capabilities)
 
 	fmt.Println("Running test suite")
 
-	testLogger := framework.ConsoleTestLogger{
+	testLogger := ldtest.ConsoleTestLogger{
 		DebugOutputOnFailure: params.debug || params.debugAll,
 		DebugOutputOnSuccess: params.debugAll,
 	}
 
-	results := ssetests.RunTestSuite(harness, params.filters.AsFilter, testLogger)
+	results := ssetests.RunTestSuite(harness, params.filters.Match, testLogger)
 
 	fmt.Println()
-	framework.PrintResults(results)
+	ldtest.PrintResults(results)
 
 	if params.stopServiceAtEnd {
 		fmt.Println("Stopping test service")

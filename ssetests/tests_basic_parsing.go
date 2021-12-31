@@ -3,129 +3,131 @@ package ssetests
 import (
 	"fmt"
 	"time"
+
+	"github.com/launchdarkly/sse-contract-tests/framework/ldtest"
 )
 
-func DoBasicParsingTests(t *T) {
-	t.Run("one-line message in one chunk", func(t *T) {
-		t.StartSSEClient()
-		t.SendOnStream("data: Hello\n\n")
-		t.RequireSpecificEvents(EventMessage{Data: "Hello"})
+func DoBasicParsingTests(t *ldtest.T) {
+	t.Run("one-line message in one chunk", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.Send("data: Hello\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Data: "Hello"})
 	})
 
-	t.Run("one-line message in two chunks", func(t *T) {
-		t.StartSSEClient()
-		t.SendOnStream("data: Hel")
-		t.SendOnStream("lo\n\n")
-		t.RequireSpecificEvents(EventMessage{Data: "Hello"})
+	t.Run("one-line message in two chunks", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.Send("data: Hel")
+		stream.Send("lo\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Data: "Hello"})
 	})
 
-	t.Run("two one-line messages in one chunk", func(t *T) {
-		t.StartSSEClient()
-		t.SendOnStream("data: Hello\n\ndata: World\n\n")
-		t.RequireSpecificEvents(
+	t.Run("two one-line messages in one chunk", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.Send("data: Hello\n\ndata: World\n\n")
+		client.RequireSpecificEvents(t,
 			EventMessage{Data: "Hello"},
 			EventMessage{Data: "World"})
 	})
 
-	t.Run("one two-line message in one chunk", func(t *T) {
-		t.StartSSEClient()
-		t.SendOnStream("data: Hello\ndata:World\n\n")
-		t.RequireSpecificEvents(EventMessage{Data: "Hello\nWorld"})
+	t.Run("one two-line message in one chunk", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.Send("data: Hello\ndata:World\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Data: "Hello\nWorld"})
 	})
 
-	t.Run("empty data", func(t *T) {
-		t.StartSSEClient()
-		t.SendOnStream("data:\n\n")
-		t.RequireSpecificEvents(EventMessage{Data: ""})
+	t.Run("empty data", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.Send("data:\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Data: ""})
 	})
 
-	t.Run("event with specific type", func(t *T) {
-		t.StartSSEClient()
-		t.TellClientToExpectEventType("greeting")
-		t.SendOnStream("event: greeting\ndata: Hello\n\n")
-		t.RequireSpecificEvents(EventMessage{Type: "greeting", Data: "Hello"})
+	t.Run("event with specific type", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		client.BePreparedToReceiveEventType(t, "greeting")
+		stream.Send("event: greeting\ndata: Hello\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Type: "greeting", Data: "Hello"})
 	})
 
-	t.Run("default event type", func(t *T) {
-		t.StartSSEClient()
-		t.SendOnStream("data: Hello\n\n")
-		t.RequireSpecificEvents(EventMessage{Type: "message", Data: "Hello"})
+	t.Run("default event type", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.Send("data: Hello\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Type: "message", Data: "Hello"})
 	})
 
-	t.Run("event with ID", func(t *T) {
-		t.StartSSEClient()
-		t.SendOnStream("id: abc\ndata: Hello\n\n")
-		t.RequireSpecificEvents(EventMessage{ID: "abc", Data: "Hello"})
+	t.Run("event with ID", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.Send("id: abc\ndata: Hello\n\n")
+		client.RequireSpecificEvents(t, EventMessage{ID: "abc", Data: "Hello"})
 	})
 
-	t.Run("event with type and ID", func(t *T) {
-		t.StartSSEClient()
-		t.TellClientToExpectEventType("greeting")
-		t.SendOnStream("event: greeting\nid: abc\ndata: Hello\n\n")
-		t.RequireSpecificEvents(EventMessage{Type: "greeting", ID: "abc", Data: "Hello"})
+	t.Run("event with type and ID", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		client.BePreparedToReceiveEventType(t, "greeting")
+		stream.Send("event: greeting\nid: abc\ndata: Hello\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Type: "greeting", ID: "abc", Data: "Hello"})
 	})
 
-	t.Run("ID field is ignored if it contains a null", func(t *T) {
-		t.StartSSEClient()
-		t.SendOnStream("id: a\x00bc\ndata: Hello\n\n")
-		t.RequireSpecificEvents(EventMessage{Data: "Hello"})
+	t.Run("ID field is ignored if it contains a null", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.Send("id: a\x00bc\ndata: Hello\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Data: "Hello"})
 	})
 
-	t.Run("last ID persists if not overridden by later event", func(t *T) {
-		t.StartSSEClient()
-		t.SendOnStream("id: abc\ndata: first\n\n")
-		t.SendOnStream("data: second\n\n")
-		t.RequireSpecificEvents(
+	t.Run("last ID persists if not overridden by later event", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.Send("id: abc\ndata: first\n\n")
+		stream.Send("data: second\n\n")
+		client.RequireSpecificEvents(t,
 			EventMessage{ID: "abc", Data: "first"},
 			EventMessage{ID: "abc", Data: "second"},
 		)
 	})
 
-	t.Run("last ID can be overridden by an empty value", func(t *T) {
-		t.StartSSEClient()
-		t.SendOnStream("id: abc\ndata: first\n\n")
-		t.SendOnStream("id: \ndata: second\n\n")
-		t.RequireSpecificEvents(
+	t.Run("last ID can be overridden by an empty value", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.Send("id: abc\ndata: first\n\n")
+		stream.Send("id: \ndata: second\n\n")
+		client.RequireSpecificEvents(t,
 			EventMessage{ID: "abc", Data: "first"},
 			EventMessage{Data: "second"},
 		)
 	})
 
-	t.Run("fields in reverse order", func(t *T) {
-		t.StartSSEClient()
-		t.TellClientToExpectEventType("greeting")
-		t.SendOnStream("data: Hello\nid: abc\nevent: greeting\n\n")
-		t.RequireSpecificEvents(EventMessage{Type: "greeting", ID: "abc", Data: "Hello"})
+	t.Run("fields in reverse order", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		client.BePreparedToReceiveEventType(t, "greeting")
+		stream.Send("data: Hello\nid: abc\nevent: greeting\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Type: "greeting", ID: "abc", Data: "Hello"})
 	})
 
-	t.Run("unknown field is ignored", func(t *T) {
-		t.StartSSEClient()
-		t.TellClientToExpectEventType("greeting")
-		t.SendOnStream("event: greeting\ncolor: blue\ndata: Hello\n\n")
-		t.RequireSpecificEvents(EventMessage{Type: "greeting", Data: "Hello"})
+	t.Run("unknown field is ignored", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		client.BePreparedToReceiveEventType(t, "greeting")
+		stream.Send("event: greeting\ncolor: blue\ndata: Hello\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Type: "greeting", Data: "Hello"})
 	})
 
-	t.Run("fields without leading space", func(t *T) {
-		t.StartSSEClient()
-		t.TellClientToExpectEventType("greeting")
-		t.SendOnStream("event:greeting\ndata:Hello\n\n")
-		t.RequireSpecificEvents(EventMessage{Type: "greeting", Data: "Hello"})
+	t.Run("fields without leading space", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		client.BePreparedToReceiveEventType(t, "greeting")
+		stream.Send("event:greeting\ndata:Hello\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Type: "greeting", Data: "Hello"})
 	})
 
-	t.Run("fields with extra leading space", func(t *T) {
-		t.StartSSEClient()
-		t.TellClientToExpectEventType(" greeting")
-		t.SendOnStream("event:  greeting\ndata:  Hello\n\n")
-		t.RequireSpecificEvents(EventMessage{Type: " greeting", Data: " Hello"})
+	t.Run("fields with extra leading space", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		client.BePreparedToReceiveEventType(t, " greeting")
+		stream.Send("event:  greeting\ndata:  Hello\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Type: " greeting", Data: " Hello"})
 	})
 
-	t.Run("multi-byte characters", func(t *T) {
-		t.StartSSEClient()
-		t.SendOnStream("data: €豆腐\n\n")
-		t.RequireSpecificEvents(EventMessage{Data: "€豆腐"})
+	t.Run("multi-byte characters", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.Send("data: €豆腐\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Data: "€豆腐"})
 	})
 
-	t.Run("many messages in rapid succession", func(t *T) {
+	t.Run("many messages in rapid succession", func(t *ldtest.T) {
 		// This test verifies that the SSE client delivers messages in the same order they were received
 		messageCount := 100
 		allMessages := ""
@@ -136,14 +138,14 @@ func DoBasicParsingTests(t *T) {
 			expected = append(expected, EventMessage{Data: data})
 		}
 
-		t.StartSSEClient()
-		t.SendOnStream(allMessages)
-		t.RequireSpecificEvents(expected...)
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.Send(allMessages)
+		client.RequireSpecificEvents(t, expected...)
 	})
 
-	t.Run("multi-byte characters sent in single-byte pieces", func(t *T) {
-		t.StartSSEClient()
-		t.SendOnStreamInChunks("data: €豆腐\n\n", 1, time.Millisecond*20)
-		t.RequireSpecificEvents(EventMessage{Data: "€豆腐"})
+	t.Run("multi-byte characters sent in single-byte pieces", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.SendInChunks("data: €豆腐\n\n", 1, time.Millisecond*20)
+		client.RequireSpecificEvents(t, EventMessage{Data: "€豆腐"})
 	})
 }

@@ -1,4 +1,4 @@
-package framework
+package ldtest
 
 import (
 	"errors"
@@ -23,9 +23,12 @@ func reformatError(err error) error {
 	out := append([]string(nil), messages...)
 	out = append(out, "  Error trace:")
 	for _, line := range traces {
-		if strings.HasPrefix(line, "tests_") {
-			out = append(out, "    "+line)
+		if strings.Contains(line, "test_scope.go") {
+			// This is a hack based on the fact that test_scope.go contains the T.Run method that
+			// all test stacktraces should start at.
+			break
 		}
+		out = append(out, "    "+line)
 	}
 	return errors.New(strings.Join(out, "\n"))
 }
@@ -41,15 +44,16 @@ func parseTestifyFailureMessage(msg string) ([]string, []string, bool) {
 		if line == "" {
 			continue
 		}
-		if len(messages) > 0 {
+		switch {
+		case len(messages) > 0:
 			messages = append(messages, line)
-		} else if len(traces) > 0 {
+		case len(traces) > 0:
 			if strings.Contains(line, "Error:") {
 				messages = append(messages, strings.TrimSpace(strings.TrimPrefix(line, "Error:")))
 			} else {
 				traces = append(traces, line)
 			}
-		} else {
+		default:
 			if strings.Contains(line, "Error Trace:") {
 				traces = append(traces, strings.TrimSpace(strings.TrimPrefix(line, "Error Trace:")))
 			}

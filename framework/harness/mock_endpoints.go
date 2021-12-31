@@ -1,4 +1,4 @@
-package framework
+package harness
 
 import (
 	"bytes"
@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/launchdarkly/sse-contract-tests/framework"
 )
 
 const endpointPathPrefix = "/endpoints/"
@@ -18,7 +20,7 @@ type mockEndpointsManager struct {
 	endpoints       map[string]*MockEndpoint
 	lastEndpointID  int
 	externalBaseURL string
-	logger          Logger
+	logger          framework.Logger
 	lock            sync.Mutex
 }
 
@@ -33,7 +35,7 @@ type MockEndpoint struct {
 	newConns    chan IncomingRequestInfo
 	activeConn  *IncomingRequestInfo
 	cancels     []*context.CancelFunc
-	logger      Logger
+	logger      framework.Logger
 	lock        sync.Mutex
 	closing     sync.Once
 }
@@ -47,7 +49,7 @@ type IncomingRequestInfo struct {
 	Context context.Context
 }
 
-func newMockEndpointsManager(externalBaseURL string, logger Logger) *mockEndpointsManager {
+func newMockEndpointsManager(externalBaseURL string, logger framework.Logger) *mockEndpointsManager {
 	return &mockEndpointsManager{
 		endpoints:       make(map[string]*MockEndpoint),
 		externalBaseURL: externalBaseURL,
@@ -58,7 +60,7 @@ func newMockEndpointsManager(externalBaseURL string, logger Logger) *mockEndpoin
 func (m *mockEndpointsManager) newMockEndpoint(
 	handler http.Handler,
 	contextFn func(context.Context) context.Context,
-	logger Logger,
+	logger framework.Logger,
 ) *MockEndpoint {
 	if logger == nil {
 		logger = m.logger
@@ -109,7 +111,7 @@ func (m *mockEndpointsManager) serveHTTP(w http.ResponseWriter, r *http.Request)
 	var body []byte
 	if r.Body != nil {
 		data, err := ioutil.ReadAll(r.Body)
-		r.Body.Close()
+		_ = r.Body.Close()
 		if err != nil {
 			m.logger.Printf("Unexpected error trying to read request body: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
