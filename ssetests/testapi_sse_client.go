@@ -21,10 +21,11 @@ import (
 const awaitMessageTimeout = time.Second * 5
 
 type SSEClient struct {
-	service       *harness.TestServiceEntity
-	outputCh      chan messageOrError
-	callbackQueue *harness.MessageSortingQueue
-	logger        framework.Logger
+	service         *harness.TestServiceEntity
+	outputCh        chan messageOrError
+	callbackQueue   *harness.MessageSortingQueue
+	ignoreNextError bool
+	logger          framework.Logger
 }
 
 type SSEClientConfigurer interface {
@@ -137,14 +138,22 @@ func (c *SSEClient) handleCallback(w http.ResponseWriter, req *http.Request) {
 func (c *SSEClient) AwaitMessage(timeout time.Duration) (ReceivedMessage, error) {
 	deadline := time.NewTimer(timeout)
 	defer deadline.Stop()
-	select {
-	case item, ok := <-c.outputCh:
-		if !ok {
-			return ReceivedMessage{}, errors.New("callback endpoint was already closed")
+	for {
+		select {
+		case item, ok := <-c.outputCh:
+			if !ok {
+				return ReceivedMessage{}, errors.New("callback endpoint was already closed")
+			}
+			if c.ignoreNextError {
+				c.ignoreNextError = false
+				if item.message.Kind == "error" {
+					continue
+				}
+			}
+			return item.message, nil
+		case <-deadline.C:
+			return ReceivedMessage{}, errors.New("timed out waiting for message from test service entity")
 		}
-		return item.message, nil
-	case <-deadline.C:
-		return ReceivedMessage{}, errors.New("timed out waiting for message from test service entity")
 	}
 }
 
@@ -179,6 +188,18 @@ func (c *SSEClient) RequireEvent(t *ldtest.T) EventMessage {
 // receive from the test service us is not an error.
 func (c *SSEClient) RequireError(t *ldtest.T) string {
 	return c.requireMessageOfKind(t, "error").Error
+}
+
+// IgnoreErrorHere specifies that the next message from the client should be ignored if and
+// only if it is an error.
+//
+// Some SSE client implementations report an unexpected end of stream as an error; others do not.
+// In tests that are not actually trying to produce an error, but are simply checking for proper
+// reconnection behavior after a connection is dropped, you can use this method after dropping
+// the connection to ensure that the rest of the test behaves correctly either way if you are
+// trying to read events.
+func (c *SSEClient) IgnoreErrorHere() {
+	c.ignoreNextError = true
 }
 
 // RequireSpecificEvents waits for the SSE client in the test service to tell us that it received
