@@ -36,8 +36,28 @@ If any parameters are invalid, return HTTP `400`.
 
 A `POST` request to the resource that was returned by "Create stream" means the test harness wants to do something to an existing SSE client instance. The request body is a JSON object which can be one of the following:
 
-* `{ "command": "listen", "type": "<EVENT TYPE>" }` - The SSE client should be ready to receive events with the type `EVENT TYPE`. This will only be sent if the test service has the `"event-type-listeners"` capability.
-* `{ "command": "restart" }` - The SSE client should disconnect and reconnect with the same stream URL. This will only be sent if the test service has the `"restart"` capability.
+#### `listen` command
+
+```json
+{
+  "command": "listen",
+  "listen": {
+    "type": "<EVENT TYPE>"
+  }
+}
+```
+
+This means the SSE client should be ready to receive events with the type `EVENT TYPE`. This will only be sent if the test service has the `"event-type-listeners"` capability.
+
+#### `restart` command
+
+```json
+{
+  "command": "restart"
+}
+```
+
+This means SSE client should disconnect and reconnect with the same stream URL. This will only be sent if the test service has the `"restart"` capability.
 
 Return any HTTP `2xx` status, `400` for an unrecognized command, or `404` if there is no such stream.
 
