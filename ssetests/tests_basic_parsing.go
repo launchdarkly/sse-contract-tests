@@ -121,6 +121,16 @@ func DoBasicParsingTests(t *ldtest.T) {
 		client.RequireSpecificEvents(t, EventMessage{Type: " greeting", Data: " Hello"})
 	})
 
+	t.Run("field with no colon", func(t *ldtest.T) {
+		// a line that says only "data" should be equivalent to "data:"
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.Send("data\n\ndata\ndata\n\n")
+		client.RequireSpecificEvents(t,
+			EventMessage{Data: ""},
+			EventMessage{Data: "\n"},
+		)
+	})
+
 	t.Run("multi-byte characters", func(t *ldtest.T) {
 		_, stream, client := NewStreamAndSSEClient(t)
 		stream.Send("data: €豆腐\n\n")
