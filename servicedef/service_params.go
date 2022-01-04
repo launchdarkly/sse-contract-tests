@@ -17,8 +17,8 @@ type CreateStreamParams struct {
 }
 
 type CommandParams struct {
-	Command string `json:"command"`
-	Listen  *ListenParams
+	Command string        `json:"command"`
+	Listen  *ListenParams `json:"listen"`
 }
 
 type ListenParams struct {
