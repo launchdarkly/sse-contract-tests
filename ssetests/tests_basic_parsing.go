@@ -122,7 +122,16 @@ func DoBasicParsingTests(t *ldtest.T) {
 	})
 
 	t.Run("field with no colon", func(t *ldtest.T) {
-		// a line that says only "data" should be equivalent to "data:"
+		// A line that says only "data" should be equivalent to "data:". Here we'll send two
+		// events as follows:
+		//
+		//     data
+		//
+		//     data
+		//     data
+		//
+		// The first of those should translate into an event with empty data. The second is an
+		// event with a single newline in the data, just as it would if each "data" was "data:".
 		_, stream, client := NewStreamAndSSEClient(t)
 		stream.Send("data\n\ndata\ndata\n\n")
 		client.RequireSpecificEvents(t,
