@@ -1,8 +1,13 @@
 package ssetests
 
 import (
+	"fmt"
+	"net/http"
+
 	"github.com/launchdarkly/sse-contract-tests/framework/ldtest"
 	"github.com/launchdarkly/sse-contract-tests/servicedef"
+
+	"github.com/launchdarkly/go-test-helpers/v2/httphelpers"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -17,6 +22,26 @@ func DoHTTPBehaviorTests(t *ldtest.T) {
 		assert.Empty(t, stream.RequestInfo.Headers.Values("Last-Event-Id"),
 			"Last-Event-Id header should not have had a value")
 	})
+
+	for _, status := range []int{301, 307} {
+		t.Run(fmt.Sprintf("client follows %d redirect", status), func(t *ldtest.T) {
+			server := NewStreamServer(t)
+
+			headers := make(http.Header)
+			headers.Set("Location", server.endpoint.BaseURL())
+			handler := httphelpers.HandlerWithResponse(status, headers, nil)
+			endpointReturningRedirect := requireContext(t).harness.NewMockEndpoint(handler, nil, t.DebugLogger())
+			t.Defer(endpointReturningRedirect.Close)
+
+			client := NewSSEClient(t, WithClientParams(servicedef.CreateStreamParams{
+				StreamURL: endpointReturningRedirect.BaseURL(),
+			}))
+
+			stream := server.AwaitConnection(t)
+			stream.Send("data: hello\n\n")
+			client.RequireSpecificEvents(t, EventMessage{Data: "hello"})
+		})
+	}
 
 	t.Run("custom headers", func(t *ldtest.T) {
 		t.RequireCapability("headers")
