@@ -161,6 +161,7 @@ func DoReconnectionTests(t *ldtest.T) {
 		client.RequireSpecificEvents(t, EventMessage{ID: "abc", Data: "Hello"})
 
 		stream1.BreakConnection()
+		client.IgnoreErrorHere() // client may or may not signal an error; we only care about the events here
 
 		stream2 := server.AwaitConnection(t)
 		stream2.Send("data: We meet again\n\n")
