@@ -179,7 +179,9 @@ func (c *SSEClient) requireMessageOfKind(t *ldtest.T, kind string) ReceivedMessa
 // The test fails and immediately exits if it times out without receiving anything, or if what we
 // receive from the test service us is not an event.
 func (c *SSEClient) RequireEvent(t *ldtest.T) EventMessage {
-	return *(c.requireMessageOfKind(t, "event").Event)
+	e := c.requireMessageOfKind(t, "event").Event
+	require.NotNil(t, e, "event callback missing \"event\" object data")
+	return *e
 }
 
 // RequireError waits for the SSE client in the test service to tell us that it received an error.
