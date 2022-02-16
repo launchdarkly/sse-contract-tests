@@ -3,6 +3,13 @@
 All notable changes to the project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org).
 
 
+## [2.1.0] - 2022-02-16
+### Added:
+- The downloadable artifacts now include arm64 builds.
+
+### Fixed:
+- If the test service neglects to send a required `event` field in a callback, it now produces a clear error rather than a panic.
+
 ## [2.0.0] - 2022-01-05
 This new major version release is due to a non-backward-compatible change in the test service protocol (regarding the `listen` command). Be aware that projects that currently pass the tests might fail in the future due to a new mandatory test in a minor version release, if the new test is for behavior that was already required by the specification. See `docs/deploying.md` for more about versioning of this tool.
 
