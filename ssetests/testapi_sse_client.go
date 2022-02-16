@@ -180,7 +180,7 @@ func (c *SSEClient) requireMessageOfKind(t *ldtest.T, kind string) ReceivedMessa
 // receive from the test service us is not an event.
 func (c *SSEClient) RequireEvent(t *ldtest.T) EventMessage {
 	e := c.requireMessageOfKind(t, "event").Event
-	require.NotNil(t, e, "event callback missing \"event\" object data")
+	require.NotNil(t, e, "missing object field \"event\" on expected \"event\" message")
 	return *e
 }
 
