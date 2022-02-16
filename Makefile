@@ -1,5 +1,5 @@
 
-GORELEASER_VERSION=v0.141.0
+GORELEASER_VERSION=v0.175.0
 GORELEASER_CMD=curl -sL https://git.io/goreleaser | GOPATH=$(mktemp -d) VERSION=$(GORELEASER_VERSION) bash -s -- --rm-dist
 
 GOLANGCI_LINT_VERSION=v1.43.0
