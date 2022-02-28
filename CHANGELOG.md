@@ -3,6 +3,10 @@
 All notable changes to the project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org).
 
 
+## [2.1.1] - 2022-02-28
+### Fixed:
+- Fixed handling of spaces in command-line argument values
+
 ## [2.1.0] - 2022-02-16
 ### Added:
 - The downloadable artifacts now include arm64 builds.
