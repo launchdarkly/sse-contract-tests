@@ -12,6 +12,7 @@ var AllCapabilities = []string{ //nolint:gochecknoglobals
 	"post",
 	"read-timeout",
 	"report",
+	"empty-or-missing-location",
 }
 
 func RunTestSuite(

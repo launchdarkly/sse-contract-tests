@@ -41,6 +41,30 @@ func DoHTTPBehaviorTests(t *ldtest.T) {
 			stream.Send("data: hello\n\n")
 			client.RequireSpecificEvents(t, EventMessage{Data: "hello"})
 		})
+
+		// The intention of these tests are to ensure the client does not, when presented
+		// with an empty or missing Location header:
+		// 1) Loop infinitely
+		// 2) Keep using the current URL without emitting an error
+		for _, action := range []string{"empty", "missing"} {
+			t.Run(fmt.Sprintf("client handles %s Location header with %d status", action, status), func(t *ldtest.T) {
+				t.RequireCapability("empty-or-missing-location")
+
+				headers := make(http.Header)
+				if action == "empty" {
+					headers.Set("Location", "")
+				}
+				handler := httphelpers.HandlerWithResponse(status, headers, nil)
+				endpointReturningRedirect := requireContext(t).harness.NewMockEndpoint(handler, nil, t.DebugLogger())
+				t.Defer(endpointReturningRedirect.Close)
+
+				client := NewSSEClient(t, WithClientParams(servicedef.CreateStreamParams{
+					StreamURL: endpointReturningRedirect.BaseURL(),
+				}))
+
+				client.RequireError(t)
+			})
+		}
 	}
 
 	t.Run("custom headers", func(t *ldtest.T) {
