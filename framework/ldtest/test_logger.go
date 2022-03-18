@@ -10,11 +10,11 @@ import (
 	"github.com/fatih/color"
 )
 
-var consoleTestErrorColor = color.New(color.FgYellow)              //nolint:gochecknoglobals
-var consoleTestFailedColor = color.New(color.FgRed)                //nolint:gochecknoglobals
-var consoleTestSkippedColor = color.New(color.Faint, color.FgBlue) //nolint:gochecknoglobals
-var consoleDebugOutputColor = color.New(color.Faint)               //nolint:gochecknoglobals
-var allTestsPassedColor = color.New(color.FgGreen)                 //nolint:gochecknoglobals
+var consoleTestErrorColor = color.New(color.FgYellow) //nolint:gochecknoglobals
+var consoleTestFailedColor = color.New(color.FgRed)   //nolint:gochecknoglobals
+var consoleTestSkippedColor = color.New(color.FgBlue) //nolint:gochecknoglobals
+var consoleDebugOutputColor = color.New(color.Faint)  //nolint:gochecknoglobals
+var allTestsPassedColor = color.New(color.FgGreen)    //nolint:gochecknoglobals
 
 type TestLogger interface {
 	TestStarted(id TestID)
