@@ -48,8 +48,6 @@ func DoHTTPBehaviorTests(t *ldtest.T) {
 		// 2) Keep using the current URL without emitting an error
 		for _, action := range []string{"empty", "missing"} {
 			t.Run(fmt.Sprintf("client handles %s Location header with %d status", action, status), func(t *ldtest.T) {
-				t.RequireCapability("empty-or-missing-location")
-
 				headers := make(http.Header)
 				if action == "empty" {
 					headers.Set("Location", "")
