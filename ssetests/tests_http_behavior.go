@@ -3,6 +3,7 @@ package ssetests
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/launchdarkly/sse-contract-tests/framework/ldtest"
 	"github.com/launchdarkly/sse-contract-tests/servicedef"
@@ -21,6 +22,23 @@ func DoHTTPBehaviorTests(t *ldtest.T) {
 			"missing or incorrect Cache-Control header")
 		assert.Empty(t, stream.RequestInfo.Headers.Values("Last-Event-Id"),
 			"Last-Event-Id header should not have had a value")
+	})
+
+	t.Run("204 halts re-connection attempts", func(t *ldtest.T) {
+		h := httphelpers.HandlerWithStatus(204)
+		rh, requestsCh := httphelpers.RecordingHandler(h)
+
+		endpointReturning204 := requireContext(t).harness.NewMockEndpoint(rh, nil, t.DebugLogger())
+		t.Defer(endpointReturning204.Close)
+
+		_ = NewSSEClient(t, WithClientParams(servicedef.CreateStreamParams{
+			StreamURL: endpointReturning204.BaseURL(),
+		}))
+
+		// Give time for the client to reconnect if it is going to try
+		time.Sleep(time.Second)
+
+		assert.Equal(t, 1, len(requestsCh))
 	})
 
 	for _, status := range []int{301, 307} {
