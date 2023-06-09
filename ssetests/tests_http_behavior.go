@@ -24,22 +24,24 @@ func DoHTTPBehaviorTests(t *ldtest.T) {
 			"Last-Event-Id header should not have had a value")
 	})
 
-	t.Run("204 halts re-connection attempts", func(t *ldtest.T) {
-		h := httphelpers.HandlerWithStatus(204)
-		rh, requestsCh := httphelpers.RecordingHandler(h)
+	if t.Capabilities().Has("204") {
+		t.Run("204 halts re-connection attempts", func(t *ldtest.T) {
+			h := httphelpers.HandlerWithStatus(204)
+			rh, requestsCh := httphelpers.RecordingHandler(h)
 
-		endpointReturning204 := requireContext(t).harness.NewMockEndpoint(rh, nil, t.DebugLogger())
-		t.Defer(endpointReturning204.Close)
+			endpointReturning204 := requireContext(t).harness.NewMockEndpoint(rh, nil, t.DebugLogger())
+			t.Defer(endpointReturning204.Close)
 
-		_ = NewSSEClient(t, WithClientParams(servicedef.CreateStreamParams{
-			StreamURL: endpointReturning204.BaseURL(),
-		}))
+			_ = NewSSEClient(t, WithClientParams(servicedef.CreateStreamParams{
+				StreamURL: endpointReturning204.BaseURL(),
+			}))
 
-		// Give time for the client to reconnect if it is going to try
-		time.Sleep(time.Second)
+			// Give time for the client to reconnect if it is going to try
+			time.Sleep(time.Second)
 
-		assert.Equal(t, 1, len(requestsCh))
-	})
+			assert.Equal(t, 1, len(requestsCh))
+		})
+	}
 
 	for _, status := range []int{301, 307} {
 		t.Run(fmt.Sprintf("client follows %d redirect", status), func(t *ldtest.T) {

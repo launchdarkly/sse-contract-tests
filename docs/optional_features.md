@@ -69,3 +69,9 @@ If this capability is enabled, the test harness will expect that it can set `met
 This means that the caller can tell the SSE client to immediately disconnect the active stream and restart the connection, exactly as it would do if the server had dropped the connection.
 
 If this capability is enabled, the test harness will expect that it can send a `"restart"` command and the client will restart the connection (with the same URL as before) as soon as possible.
+
+## Server directed shutdown request (capability `"204"`)
+
+This means that the server can direct the SSE client to shutdown processing and halt all retry attempts.
+
+If this capability is enabled, the test harness will expect that a client connecting and receiving a 204 response will not attempt to reconnect upon disconnect.
