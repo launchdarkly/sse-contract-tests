@@ -3,6 +3,11 @@
 All notable changes to the project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org).
 
 
+## [2.2.0] - 2023-06-12
+### Added:
+- Add capability-protected test to ensure a 204 can direct the eventsource to stop retrying disconnects.
+- Add test to ensure an empty location header is handled with an appropriate error.
+
 ## [2.1.1] - 2022-02-28
 ### Fixed:
 - Fixed handling of spaces in command-line argument values
