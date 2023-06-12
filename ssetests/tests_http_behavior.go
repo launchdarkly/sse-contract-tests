@@ -24,7 +24,7 @@ func DoHTTPBehaviorTests(t *ldtest.T) {
 			"Last-Event-Id header should not have had a value")
 	})
 
-	if t.Capabilities().Has("204") {
+	if t.Capabilities().Has("server-directed-shutdown-request") {
 		t.Run("204 halts re-connection attempts", func(t *ldtest.T) {
 			h := httphelpers.HandlerWithStatus(204)
 			rh, requestsCh := httphelpers.RecordingHandler(h)

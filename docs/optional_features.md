@@ -70,7 +70,7 @@ This means that the caller can tell the SSE client to immediately disconnect the
 
 If this capability is enabled, the test harness will expect that it can send a `"restart"` command and the client will restart the connection (with the same URL as before) as soon as possible.
 
-## Server directed shutdown request (capability `"204"`)
+## Server directed shutdown request (capability `"server-directed-shutdown-request"`)
 
 This means that the server can direct the SSE client to shutdown processing and halt all retry attempts.
 
