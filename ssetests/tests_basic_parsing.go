@@ -1,17 +1,53 @@
 package ssetests
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"time"
 
 	"github.com/launchdarkly/sse-contract-tests/framework/ldtest"
 )
+
+func generateRandomString(length int) string {
+	b := make([]byte, length)
+	_, err := rand.Read(b)
+	if err != nil {
+		panic(err)
+	}
+	return base64.StdEncoding.EncodeToString(b)
+}
 
 func DoBasicParsingTests(t *ldtest.T) {
 	t.Run("one-line message in one chunk", func(t *ldtest.T) {
 		_, stream, client := NewStreamAndSSEClient(t)
 		stream.Send("data: Hello\n\n")
 		client.RequireSpecificEvents(t, EventMessage{Data: "Hello"})
+	})
+
+	t.Run("large message in one chunk", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		randomData := generateRandomString(10 * 1024 * 1024)
+		stream.Send("data: " + randomData + "\n\n")
+		//client.RequireSpecificEvents(t, EventMessage{Data: randomData})
+		actual := client.RequireEvent(t)
+		if actual.Data != randomData {
+			assert.Fail(t, "Random message data did not match.")
+		}
+	})
+
+	t.Run("large message in two chunks", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		randomDataA := generateRandomString(5 * 1024 * 1024)
+		randomDataB := generateRandomString(5 * 1024 * 1024)
+		stream.Send("data: " + randomDataA)
+		stream.Send(randomDataB + "\n\n")
+		//client.RequireSpecificEvents(t, EventMessage{Data: randomDataA + randomDataB})
+		actual := client.RequireEvent(t)
+		if actual.Data != (randomDataA + randomDataB) {
+			assert.Fail(t, "Random message data did not match.")
+		}
 	})
 
 	t.Run("one-line message in two chunks", func(t *ldtest.T) {
