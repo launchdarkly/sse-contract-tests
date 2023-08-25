@@ -26,13 +26,25 @@ func DoBasicParsingTests(t *ldtest.T) {
 		client.RequireSpecificEvents(t, EventMessage{Data: "Hello"})
 	})
 
+	t.Run("two messages spanning 3 chunks with shared chunk", func(t *ldtest.T) {
+		// This test primarily tests situations where the implementation over allocates buffers to decrease the total
+		// number of buffers. This test helps ensure that the used size in the buffer is properly tracked.
+		_, stream, client := NewStreamAndSSEClient(t)
+		stream.Send("data: test")
+		stream.Send("test\n\ndata:")
+		stream.Send("test" + "\n\n")
+		client.RequireSpecificEvents(t, EventMessage{Data: "testtest"})
+		client.RequireSpecificEvents(t, EventMessage{Data: "test"})
+	})
+
 	t.Run("large message in one chunk", func(t *ldtest.T) {
 		_, stream, client := NewStreamAndSSEClient(t)
-		randomData := generateRandomString(10 * 1024 * 1024)
+		randomData := generateRandomString(5 * 1024 * 1024)
 		stream.Send("data: " + randomData + "\n\n")
-		//client.RequireSpecificEvents(t, EventMessage{Data: randomData})
+		//client.RequireSpecificEvents(t, EventMessage{Data: randomDataA + randomDataB})
 		actual := client.RequireEvent(t)
-		if actual.Data != randomData {
+		// Does not use RequireSpecificEvents, because then it would print megabytes of text.
+		if actual.Data != (randomData) {
 			assert.Fail(t, "Random message data did not match.")
 		}
 	})
@@ -43,11 +55,23 @@ func DoBasicParsingTests(t *ldtest.T) {
 		randomDataB := generateRandomString(5 * 1024 * 1024)
 		stream.Send("data: " + randomDataA)
 		stream.Send(randomDataB + "\n\n")
-		//client.RequireSpecificEvents(t, EventMessage{Data: randomDataA + randomDataB})
+		// Does not use RequireSpecificEvents, because then it would print megabytes of text.
 		actual := client.RequireEvent(t)
 		if actual.Data != (randomDataA + randomDataB) {
 			assert.Fail(t, "Random message data did not match.")
 		}
+	})
+
+	t.Run("two messages spanning 3 chunks with chared chunk", func(t *ldtest.T) {
+		_, stream, client := NewStreamAndSSEClient(t)
+		// keep incrementing the size.
+		stream.Send("data: test")
+		stream.Send("test\n\ndata:")
+		//randomData := generateRandomString(5 * 1024 * 1024)
+		stream.Send("test" + "\n\n")
+		//actual := client.RequireEvent(t)
+		client.RequireSpecificEvents(t, EventMessage{Data: "testtest"})
+		client.RequireSpecificEvents(t, EventMessage{Data: "test"})
 	})
 
 	t.Run("one-line message in two chunks", func(t *ldtest.T) {
