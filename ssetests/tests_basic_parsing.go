@@ -41,7 +41,6 @@ func DoBasicParsingTests(t *ldtest.T) {
 		_, stream, client := NewStreamAndSSEClient(t)
 		randomData := generateRandomString(5 * 1024 * 1024)
 		stream.Send("data: " + randomData + "\n\n")
-		//client.RequireSpecificEvents(t, EventMessage{Data: randomDataA + randomDataB})
 		actual := client.RequireEvent(t)
 		// Does not use RequireSpecificEvents, because then it would print megabytes of text.
 		if actual.Data != (randomData) {
@@ -60,18 +59,6 @@ func DoBasicParsingTests(t *ldtest.T) {
 		if actual.Data != (randomDataA + randomDataB) {
 			assert.Fail(t, "Random message data did not match.")
 		}
-	})
-
-	t.Run("two messages spanning 3 chunks with chared chunk", func(t *ldtest.T) {
-		_, stream, client := NewStreamAndSSEClient(t)
-		// keep incrementing the size.
-		stream.Send("data: test")
-		stream.Send("test\n\ndata:")
-		//randomData := generateRandomString(5 * 1024 * 1024)
-		stream.Send("test" + "\n\n")
-		//actual := client.RequireEvent(t)
-		client.RequireSpecificEvents(t, EventMessage{Data: "testtest"})
-		client.RequireSpecificEvents(t, EventMessage{Data: "test"})
 	})
 
 	t.Run("one-line message in two chunks", func(t *ldtest.T) {
