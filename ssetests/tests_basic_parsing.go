@@ -4,10 +4,11 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"time"
 
 	"github.com/launchdarkly/sse-contract-tests/framework/ldtest"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func generateRandomString(length int) string {
