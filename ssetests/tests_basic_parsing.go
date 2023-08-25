@@ -1,9 +1,9 @@
 package ssetests
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/launchdarkly/sse-contract-tests/framework/ldtest"
@@ -13,6 +13,7 @@ import (
 
 func generateRandomString(length int) string {
 	b := make([]byte, length)
+	rand.Seed(0)
 	_, err := rand.Read(b)
 	if err != nil {
 		panic(err)
