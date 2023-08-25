@@ -14,6 +14,8 @@ import (
 func generateRandomString(length int) string {
 	b := make([]byte, length)
 	rand.Seed(0)
+	// This does not need to be sure.
+	//nolint:G404
 	_, err := rand.Read(b)
 	if err != nil {
 		panic(err)
