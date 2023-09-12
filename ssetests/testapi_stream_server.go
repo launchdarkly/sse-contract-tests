@@ -151,5 +151,7 @@ func streamHandler(logger framework.Logger) http.Handler {
 				break Loop
 			}
 		}
+
+		panic(http.ErrAbortHandler)
 	})
 }
