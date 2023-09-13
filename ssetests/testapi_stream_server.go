@@ -137,7 +137,7 @@ func streamHandler(logger framework.Logger) http.Handler {
 					break Loop
 				}
 				if chunk.data == nil { // indicates we want to break the connection
-					panic(http.ErrAbortHandler)
+					break Loop
 				}
 				chunkStr := string(chunk.data)
 				jsonStr, _ := json.Marshal(chunkStr)
