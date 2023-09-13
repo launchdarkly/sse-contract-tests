@@ -175,7 +175,7 @@ func DoReconnectionTests(t *ldtest.T) {
 		// just want to prove that it did *not* pick up the "def" from the partial event.
 	})
 
-	t.Run("connection established after breaking connection is functional", func(t *ldtest.T) {
+	t.Run("new connection established after breaking previous is functional", func(t *ldtest.T) {
 		params := servicedef.CreateStreamParams{
 			InitialDelayMS: ldvalue.NewOptionalInt(0),
 		}
