@@ -174,4 +174,26 @@ func DoReconnectionTests(t *ldtest.T) {
 		// a more specific test for that; we don't want it to cause a misleading failure in this test. We
 		// just want to prove that it did *not* pick up the "def" from the partial event.
 	})
+
+	t.Run("new connection established after breaking previous is functional", func(t *ldtest.T) {
+		params := servicedef.CreateStreamParams{
+			InitialDelayMS: ldvalue.NewOptionalInt(0),
+		}
+		server, stream1, client := NewStreamAndSSEClient(t, WithClientParams(params))
+
+		assert.Empty(t, stream1.RequestInfo.Headers.Values("Last-Event-Id"))
+
+		stream1.Send("id: abc\ndata: Hello\n\n")
+
+		client.RequireSpecificEvents(t, EventMessage{ID: "abc", Data: "Hello"})
+
+		stream1.BreakConnection()
+		client.IgnoreErrorHere() // client may or may not signal an error; we only care about the events here
+
+		stream2 := server.AwaitConnection(t)
+
+		stream2.Send("id: def\ndata: World\n\n")
+
+		client.RequireSpecificEvents(t, EventMessage{ID: "def", Data: "World"})
+	})
 }

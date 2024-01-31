@@ -34,7 +34,6 @@ type MockEndpoint struct {
 	contextFn   func(context.Context) context.Context
 	newConns    chan IncomingRequestInfo
 	activeConn  *IncomingRequestInfo
-	cancels     []*context.CancelFunc
 	logger      framework.Logger
 	lock        sync.Mutex
 	closing     sync.Once
@@ -120,10 +119,11 @@ func (m *mockEndpointsManager) serveHTTP(w http.ResponseWriter, r *http.Request)
 		body = data
 	}
 
-	ctx, canceller := context.WithCancel(r.Context())
+	ctx := r.Context()
 	if e.contextFn != nil {
 		ctx = e.contextFn(ctx)
 	}
+
 	transformedReq := r.WithContext(ctx)
 	url := *r.URL
 	url.Path = path
@@ -141,8 +141,6 @@ func (m *mockEndpointsManager) serveHTTP(w http.ResponseWriter, r *http.Request)
 
 	e.lock.Lock()
 	e.activeConn = incoming
-	cancellerPtr := &canceller
-	e.cancels = append(e.cancels, cancellerPtr)
 	e.lock.Unlock()
 
 	select { // non-blocking push
@@ -153,15 +151,6 @@ func (m *mockEndpointsManager) serveHTTP(w http.ResponseWriter, r *http.Request)
 	}
 
 	e.handler.ServeHTTP(w, transformedReq)
-
-	e.lock.Lock()
-	for i, c := range e.cancels {
-		if c == cancellerPtr { // can't compare functions with ==, but can compare pointers
-			e.cancels = append(e.cancels[:i], e.cancels[i+1:]...)
-			break
-		}
-	}
-	e.lock.Unlock()
 }
 
 // BaseURL returns the base path of the mock endpoint.
@@ -196,13 +185,7 @@ func (e *MockEndpoint) Close() {
 		e.owner.lock.Unlock()
 
 		e.lock.Lock()
-		cancellers := e.cancels
-		e.cancels = nil
 		close(e.newConns)
 		e.lock.Unlock()
-
-		for _, cancel := range cancellers {
-			(*cancel)()
-		}
 	})
 }
