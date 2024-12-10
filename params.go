@@ -4,11 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/launchdarkly/sse-contract-tests/framework/ldtest"
-
-	"github.com/alessio/shellescape"
 )
 
 type commandParams struct {
@@ -43,16 +40,4 @@ func (c *commandParams) Read(args []string) bool {
 		return false
 	}
 	return true
-}
-
-type commandBuilder []string
-
-func (b *commandBuilder) add(args ...string) {
-	for _, a := range args {
-		*b = append(*b, shellescape.Quote(a))
-	}
-}
-
-func (b commandBuilder) String() string {
-	return strings.Join(b, " ")
 }
