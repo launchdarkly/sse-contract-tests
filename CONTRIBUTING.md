@@ -23,34 +23,7 @@ To build the project:
 make
 ```
 
-To build the Docker image locally (note that we normally use a different mechanism for publishing releases in Docker):
-```
-make docker-build
-```
-
 To run the linter:
 ```
 make lint
 ```
-
-### Testing
-
-Currently the CI build for this project consists of a smoke test where the tool is built in Docker and then run against a fake service that deliberately returns an error-- proving that the code at least builds, executes, and makes the expected initial status request.
-
-To run this test locally:
-```
-make docker-smoke-test
-```
-
-## Publishing releases
-
-We normally use our internal Releaser tool. This takes care of updating the changelog, the version string in `version.go`, and the Git release history, as well as publishing the Docker image; see scripts in `.ldrelease`.
-
-If you need to do a release manually for whatever reason, the steps are:
-
-1. Update `VERSION` and `CHANGELOG.md`. Push these changes and create a version tag such as `v1.0.0`.
-2. Use `docker login` to provide the credentials of the `ldcircleci` Docker account.
-3. Run `make publish-release`.
-4. Look in `./dist` for all `.tar.gz` and `.zip` files. These are the archives of executable binaries for various platforms. Attach these files to the GitHub release.
-
-To do a dry run locally that builds all of the executables and the Docker image without publishing them, run `make build-release`. You can also use Releaser's dry-run mode to do the same for any branch in GitHub.

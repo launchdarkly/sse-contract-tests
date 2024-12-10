@@ -17,8 +17,8 @@ builds:
       goarch: 386
 
 release:
-  disable: true # this disables releasing *to GitHub*; it will still push to Docker
-  # (we want Releaser to be responsible for doing all the GitHub release manipulations)
+  disable: true # this disables releasing *to GitHub*;
+  # (we want release-please to be responsible for doing all the GitHub release manipulations)
 
 snapshot:
   # Allows you to change the name of the generated snapshot
@@ -52,14 +52,3 @@ archives:
       - LICENSE.txt
       - README.md
       - CHANGELOG.md
-
-dockers:
-  - image_templates:
-    - "ldcircleci/sse-contract-tests:{{ .Tag }}"
-    - "ldcircleci/sse-contract-tests:{{ .Major }}"
-    - "ldcircleci/sse-contract-tests:{{ .Major }}{{ .Minor }}"
-    - "ldcircleci/sse-contract-tests:latest"
-    goos: linux
-    goarch: amd64
-    dockerfile: Dockerfile.goreleaser
-    skip_push: false

@@ -24,11 +24,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if params.outputDockerScriptVersion != "" {
-		params.outputDockerScript()
-		os.Exit(0)
-	}
-
 	mainDebugLogger := framework.NullLogger()
 	if params.debugAll {
 		mainDebugLogger = log.New(os.Stdout, "", log.LstdFlags)

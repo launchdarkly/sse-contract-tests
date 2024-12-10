@@ -5,10 +5,6 @@ inputs:
     description: 'If true, run linter.'
     required: false
     default: 'true'
-  smoke_test:
-    description: 'If true, run make docker-smokt-test.'
-    required: false
-    default: 'true'
 
 runs:
   using: composite
@@ -24,7 +20,3 @@ runs:
       if: ${{ inputs.run_linter == 'true' }}
       shell: bash
       run: make lint
-    - name: Run smoke test
-      if: ${{ inputs.run_smoke_test == 'true' }}
-      shell: bash
-      run: make docker-smoke-test
