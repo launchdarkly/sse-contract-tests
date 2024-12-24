@@ -3,6 +3,15 @@
 All notable changes to the project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org).
 
 
+## [2.31.0](https://github.com/launchdarkly/sse-contract-tests/compare/v2.30.0...v2.31.0) (2024-12-24)
+
+
+### Features
+
+* Add large message test and additional chunked message test. ([f067d20](https://github.com/launchdarkly/sse-contract-tests/commit/f067d208247e594e3c5af6e537f6a1a739995899))
+* Add test to verify 204 halts re-connection ([#20](https://github.com/launchdarkly/sse-contract-tests/issues/20)) ([01953fa](https://github.com/launchdarkly/sse-contract-tests/commit/01953fa87a2c98fdb4ed8b84fbde4ab84e7d2f08))
+* Test large message payloads. ([d9f9282](https://github.com/launchdarkly/sse-contract-tests/commit/d9f928264ee764373124926288f382653151f3c3))
+
 ## [2.3.0] - 2023-08-25
 ### Added:
 - Added a tests which use large message sizes. (5-10MB).
