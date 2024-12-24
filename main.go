@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/launchdarkly/sse-contract-tests/framework"
@@ -17,20 +16,12 @@ import (
 const defaultPort = 8111
 const statusQueryTimeout = time.Second * 10
 
-//go:embed VERSION
-var versionString string
-
 func main() {
-	fmt.Printf("sse-contract-tests v%s\n", strings.TrimSpace(versionString))
+	fmt.Print("sse-contract-tests 2.3.0") // x-release-please-version
 
 	var params commandParams
 	if !params.Read(os.Args) {
 		os.Exit(1)
-	}
-
-	if params.outputDockerScriptVersion != "" {
-		params.outputDockerScript()
-		os.Exit(0)
 	}
 
 	mainDebugLogger := framework.NullLogger()
