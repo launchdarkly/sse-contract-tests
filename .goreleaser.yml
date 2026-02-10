@@ -1,3 +1,5 @@
+version: 2
+
 project_name: sse-contract-tests
 
 builds:
@@ -31,10 +33,12 @@ snapshot:
 
 archives:
   -
-    format: tar.gz
+    formats:
+      - tar.gz
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
     # Configure the archive names so they'll be easy for an install script to get from GitHub.
     # For Linux & MacOS, we'll use the same OS and architecture strings that are returned by
