@@ -17,7 +17,7 @@ const defaultPort = 8111
 const statusQueryTimeout = time.Second * 10
 
 func main() {
-	fmt.Print("sse-contract-tests 2.3.0") // x-release-please-version
+	fmt.Print("sse-contract-tests 2.31.0") // x-release-please-version
 
 	var params commandParams
 	if !params.Read(os.Args) {

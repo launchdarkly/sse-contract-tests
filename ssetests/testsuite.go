@@ -6,6 +6,7 @@ import (
 )
 
 var AllCapabilities = []string{ //nolint:gochecknoglobals
+	"bom",
 	"comments",
 	"headers",
 	"last-event-id",
@@ -30,6 +31,7 @@ func RunTestSuite(
 
 	return ldtest.Run(config, func(t *ldtest.T) {
 		t.Run("basic parsing", DoBasicParsingTests)
+		t.Run("BOM handling", DoBOMTests)
 		t.Run("comments", DoCommentTests)
 		t.Run("linefeeds", DoLinefeedTests)
 		t.Run("HTTP behavior", DoHTTPBehaviorTests)
