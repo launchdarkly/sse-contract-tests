@@ -23,13 +23,13 @@ release:
   # (we want release-please to be responsible for doing all the GitHub release manipulations)
 
 snapshot:
-  # Allows you to change the name of the generated snapshot
+  # Allows you to change the version of the generated snapshot
   #
   # Note that some pipes require this to be semantic version compliant (nfpm,
   # for example).
   #
   # Default is `{{ .Version }}-SNAPSHOT-{{.ShortCommit}}`.
-  name_template: '{{ if index .Env "LD_RELEASE_VERSION"  }}{{ .Env.LD_RELEASE_VERSION }}{{ else }}0.0.0-SNAPSHOT{{ end }}'
+  version_template: '{{ if index .Env "LD_RELEASE_VERSION"  }}{{ .Env.LD_RELEASE_VERSION }}{{ else }}0.0.0-SNAPSHOT{{ end }}'
 
 archives:
   -
@@ -44,13 +44,7 @@ archives:
     # For Linux & MacOS, we'll use the same OS and architecture strings that are returned by
     # "uname -s" and "uname -m". So, for instance, the amd64 Linux build will be called
     # "sse-contract-tests_Linux_x86_64.tar.gz".
-    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
-    replacements:
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
-      386: i386
-      amd64: x86_64
+    name_template: "{{ .ProjectName }}_{{ .Os | title }}_{{ .Arch | replace \"amd64\" \"x86_64\" | replace \"386\" \"i386\" }}"
 
     files:
       - LICENSE.txt
