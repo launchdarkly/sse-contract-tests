@@ -6,6 +6,19 @@ By default, the test harness will not run tests for these features, since an SSE
 
 For more about the `capabilities` list, properties that the test harness can set in the client configuration, commands that the test harness may send, and callback messages that the test harness may expect, see [SSE test service specification](./service_spec.md).
 
+## BOM handling (capability: `"bom"`)
+
+This means that the SSE client correctly handles the UTF-8 BOM (Byte Order Mark) according to the SSE specification.
+
+According to the [SSE specification](https://html.spec.whatwg.org/multipage/server-sent-events.html), streams must be decoded using the UTF-8 decode algorithm, and if the stream contains a BOM (U+FEFF, byte sequence 0xEF 0xBB 0xBF), it must be stripped from the beginning of the stream before processing.
+
+If this capability is enabled, the test harness will verify that:
+- A UTF-8 BOM at the very start of the stream is stripped and does not affect event parsing
+- BOM stripping works correctly even when the BOM bytes are split across multiple chunks
+- A BOM appearing later in the stream (not at the very beginning) is treated as regular data and preserved
+
+The BOM should only be stripped once from the beginning of the stream. All subsequent data, including any BOM-like sequences in event data, should be preserved as-is.
+
 ## Reading comments (capability: `"comments"`)
 
 This means that the SSE client can report comment lines to the caller.
@@ -69,3 +82,9 @@ If this capability is enabled, the test harness will expect that it can set `met
 This means that the caller can tell the SSE client to immediately disconnect the active stream and restart the connection, exactly as it would do if the server had dropped the connection.
 
 If this capability is enabled, the test harness will expect that it can send a `"restart"` command and the client will restart the connection (with the same URL as before) as soon as possible.
+
+## Server directed shutdown request (capability `"server-directed-shutdown-request"`)
+
+This means that the server can direct the SSE client to shutdown processing and halt all retry attempts.
+
+If this capability is enabled, the test harness will expect that a client connecting and receiving a 204 response will not attempt to reconnect upon disconnect.

@@ -3,6 +3,23 @@
 All notable changes to the project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org).
 
 
+## [2.31.0](https://github.com/launchdarkly/sse-contract-tests/compare/v2.30.0...v2.31.0) (2026-02-10)
+
+
+### Features
+
+* Add BOM tests and optional capability ([#28](https://github.com/launchdarkly/sse-contract-tests/issues/28)) ([1635dff](https://github.com/launchdarkly/sse-contract-tests/commit/1635dff91a1065be5680b70e2e591d727f0048ab))
+
+## [2.3.0] - 2023-08-25
+### Added:
+- Added a tests which use large message sizes. (5-10MB).
+- Added a test which chunks 2 messages over 3 chunks, with the middle chunk being shared.
+
+## [2.2.0] - 2023-06-12
+### Added:
+- Add capability-protected test to ensure a 204 can direct the eventsource to stop retrying disconnects.
+- Add test to ensure an empty location header is handled with an appropriate error.
+
 ## [2.1.1] - 2022-02-28
 ### Fixed:
 - Fixed handling of spaces in command-line argument values

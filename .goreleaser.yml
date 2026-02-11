@@ -1,3 +1,5 @@
+version: 2
+
 project_name: sse-contract-tests
 
 builds:
@@ -15,51 +17,41 @@ builds:
   ignore: # Go 1.15+ doesn't support 32-bit Darwin
     - goos: darwin
       goarch: 386
+    - goos: windows
+      goarch: arm64
 
 release:
-  disable: true # this disables releasing *to GitHub*; it will still push to Docker
-  # (we want Releaser to be responsible for doing all the GitHub release manipulations)
+  disable: true # this disables releasing *to GitHub*;
+  # (we want release-please to be responsible for doing all the GitHub release manipulations)
 
 snapshot:
-  # Allows you to change the name of the generated snapshot
+  # Allows you to change the version of the generated snapshot
   #
   # Note that some pipes require this to be semantic version compliant (nfpm,
   # for example).
   #
   # Default is `{{ .Version }}-SNAPSHOT-{{.ShortCommit}}`.
-  name_template: '{{ if index .Env "LD_RELEASE_VERSION"  }}{{ .Env.LD_RELEASE_VERSION }}{{ else }}0.0.0-SNAPSHOT{{ end }}'
+  version_template: '{{ if index .Env "LD_RELEASE_VERSION"  }}{{ .Env.LD_RELEASE_VERSION }}{{ else }}0.0.0-SNAPSHOT{{ end }}'
 
 archives:
   -
-    format: tar.gz
+    formats:
+      - tar.gz
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
     # Configure the archive names so they'll be easy for an install script to get from GitHub.
     # For Linux & MacOS, we'll use the same OS and architecture strings that are returned by
     # "uname -s" and "uname -m". So, for instance, the amd64 Linux build will be called
     # "sse-contract-tests_Linux_x86_64.tar.gz".
-    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
-    replacements:
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
-      386: i386
-      amd64: x86_64
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64{{- else if eq .Arch "386" }}i386{{- else }}{{ .Arch }}{{ end }}
 
     files:
       - LICENSE.txt
       - README.md
       - CHANGELOG.md
-
-dockers:
-  - image_templates:
-    - "ldcircleci/sse-contract-tests:{{ .Tag }}"
-    - "ldcircleci/sse-contract-tests:{{ .Major }}"
-    - "ldcircleci/sse-contract-tests:{{ .Major }}{{ .Minor }}"
-    - "ldcircleci/sse-contract-tests:latest"
-    goos: linux
-    goarch: amd64
-    dockerfile: Dockerfile.goreleaser
-    skip_push: false
