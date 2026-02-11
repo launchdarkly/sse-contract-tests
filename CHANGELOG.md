@@ -3,6 +3,13 @@
 All notable changes to the project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org).
 
 
+## [2.31.1](https://github.com/launchdarkly/sse-contract-tests/compare/v2.31.0...v2.31.1) (2026-02-11)
+
+
+### Bug Fixes
+
+* Properly terminate inbound SSE connections ([#22](https://github.com/launchdarkly/sse-contract-tests/issues/22)) ([d898901](https://github.com/launchdarkly/sse-contract-tests/commit/d898901d9589f4a4e1c97dc72585da92ad58b052))
+
 ## [2.31.0](https://github.com/launchdarkly/sse-contract-tests/compare/v2.30.0...v2.31.0) (2026-02-10)
 
 
