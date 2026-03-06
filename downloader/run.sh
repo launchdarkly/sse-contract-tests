@@ -110,7 +110,8 @@ do_curl() {
 
   # Log response details from headers
   if [ -f "${HEADER_FILE}" ]; then
-    STATUS_LINE=$(head -n 1 "${HEADER_FILE}" | tr -d '\r')
+    # Use the last HTTP status line so we log the final response, not an intermediate redirect.
+    STATUS_LINE=$(grep -E '^HTTP/' "${HEADER_FILE}" | tail -n 1 | tr -d '\r')
     log "HTTP response: ${STATUS_LINE}"
 
     CONTENT_TYPE=$(grep -i '^content-type:' "${HEADER_FILE}" | tail -n 1 | tr -d '\r' | sed 's/^[^:]*: *//')
