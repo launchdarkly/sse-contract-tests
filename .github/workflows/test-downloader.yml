@@ -52,6 +52,7 @@ jobs:
         # Since no test service is running, the binary will fail - but the download
         # succeeding is what we're verifying here.
         continue-on-error: true
+        # Intentionally uses @main — this is our own organization's action.
         uses: launchdarkly/gh-actions/actions/contract-tests@main
         with:
           repo: sse-contract-tests
