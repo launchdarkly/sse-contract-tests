@@ -1,0 +1,66 @@
+name: Test Downloader Script
+
+on:
+  push:
+    branches: [ 'main' ]
+    paths:
+      - 'downloader/**'
+      - '.github/workflows/test-downloader.yml'
+  pull_request:
+    branches: [ 'main', 'feat/**' ]
+    paths:
+      - 'downloader/**'
+      - '.github/workflows/test-downloader.yml'
+
+jobs:
+  test-download:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux x64
+          - os: ubuntu-24.04-arm
+            name: Linux arm64
+          - os: macos-latest
+            name: macOS
+          - os: windows-latest
+            name: Windows
+
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test download with partial version
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: v2
+          PARAMS: "-version"
+        run: bash downloader/run.sh
+
+      - name: Test download with full version
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: v2.31.0
+          PARAMS: "-version"
+        run: bash downloader/run.sh
+
+      - name: Test download via curl pipe (like gh-actions/contract-tests)
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: v2
+          PARAMS: "-version"
+        run: |
+          # This simulates how launchdarkly/gh-actions/actions/contract-tests invokes the script:
+          #   curl -H "Authorization: Token ..." -s .../downloader/run.sh | bash
+          # We use a local HTTP server to serve the script and pipe it through bash.
+          python3 -m http.server 9199 &
+          SERVER_PID=$!
+          sleep 1
+          curl -s http://localhost:9199/downloader/run.sh | bash
+          kill $SERVER_PID 2>/dev/null || true
