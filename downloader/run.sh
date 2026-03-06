@@ -62,8 +62,8 @@ else
   echo "GitHub token:  not provided (API requests may be rate-limited)" >&2
 fi
 
-if [ -z "${VERSION}" -o -z "${PARAMS}" ]; then
-  echo 'You must specify a version string in $VERSION and command parameters in $PARAMS' >&2
+if [ -z "${VERSION}" ]; then
+  echo 'You must specify a version string in $VERSION' >&2
   exit 1
 fi
 
@@ -177,7 +177,10 @@ if [ -z "${VERSION_TO_DOWNLOAD}" ]; then
 fi
 
 TEMP_DIR="/tmp/sse-contract-tests_${VERSION_TO_DOWNLOAD}"
-EXECUTABLE="${TEMP_DIR}/sse-contract-tests"
+case "${OS_TYPE}" in
+  Windows) EXECUTABLE="${TEMP_DIR}/sse-contract-tests.exe" ;;
+  *)       EXECUTABLE="${TEMP_DIR}/sse-contract-tests" ;;
+esac
 DOWNLOAD_URL="${RELEASES_SITE_URL}/download/${VERSION_TO_DOWNLOAD}/${EXECUTABLE_ARCHIVE_NAME}"
 
 log ""
@@ -195,4 +198,8 @@ if [ ! -x "${EXECUTABLE}" ]; then
 fi
 
 log ""
-sh -c "${EXECUTABLE} $PARAMS"
+if [ -n "${PARAMS}" ]; then
+  sh -c "${EXECUTABLE} $PARAMS"
+else
+  log "No PARAMS specified; skipping execution (download-only mode)."
+fi
