@@ -133,7 +133,7 @@ do_curl() {
   fi
 
   if [ -z "${OUTPUT_FILE}" ]; then
-    echo "${RESPONSE}"
+    printf '%s\n' "${RESPONSE}"
   fi
 }
 
