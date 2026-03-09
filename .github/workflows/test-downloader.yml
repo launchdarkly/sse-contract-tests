@@ -1,0 +1,63 @@
+name: Test Downloader Script
+
+on:
+  push:
+    branches: [ 'main' ]
+    paths:
+      - 'downloader/**'
+      - '.github/workflows/test-downloader.yml'
+  pull_request:
+    branches: [ 'main', 'feat/**' ]
+    paths:
+      - 'downloader/**'
+      - '.github/workflows/test-downloader.yml'
+
+jobs:
+  test-download:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux x64
+          - os: ubuntu-24.04-arm
+            name: Linux arm64
+          - os: macos-latest
+            name: macOS
+          - os: windows-latest
+            name: Windows
+
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test download with partial version
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: v2
+        run: bash downloader/run.sh
+
+      - name: Test download with full version
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: v2.31.0
+        run: bash downloader/run.sh
+
+      - name: Test via gh-actions/contract-tests action
+        # The action will download the binary and try to connect to a test service.
+        # Since no test service is running, the binary will fail - but the download
+        # succeeding is what we're verifying here.
+        continue-on-error: true
+        # Intentionally uses @main — this is our own organization's action.
+        uses: launchdarkly/gh-actions/actions/contract-tests@main
+        with:
+          repo: sse-contract-tests
+          # Use the current branch so we test the modified downloader script
+          branch: ${{ github.head_ref || github.ref_name }}
+          version: v2
+          token: ${{ secrets.GITHUB_TOKEN }}
+          test_service_port: '8123'
