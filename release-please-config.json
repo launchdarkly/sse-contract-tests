@@ -6,6 +6,7 @@
       "bump-minor-pre-major" : true,
       "versioning" : "default",
       "include-component-in-tag" : false,
+      "draft" : true,
       "extra-files" : [
         "main.go"
       ]
