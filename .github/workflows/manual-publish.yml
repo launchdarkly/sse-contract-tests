@@ -4,9 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'The tag to upload release artifacts to (e.g., v1.2.3)'
+        description: 'The tag to upload release artifacts to an existing draft release (e.g., v1.2.3)'
         required: true
         type: string
+      publish_release:
+        description: 'Whether to publish (un-draft) the release after uploading artifacts'
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   manual-publish:
@@ -36,5 +41,22 @@ jobs:
     - name: Upload Release Artifacts
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TAG_NAME: ${{ inputs.tag }}
       run: |
-        gh release upload ${{ inputs.tag }} ./dist/*.tar.gz ./dist/*.zip --clobber
+        gh release upload "${TAG_NAME}" ./dist/*.tar.gz ./dist/*.zip --clobber
+
+  publish-release:
+    needs: manual-publish
+    if: ${{ format('{0}', inputs.publish_release) == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ inputs.tag }}
+        run: >
+          gh release edit "$TAG_NAME"
+          --repo ${{ github.repository }}
+          --draft=false
