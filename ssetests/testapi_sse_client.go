@@ -184,6 +184,22 @@ func (c *SSEClient) RequireEvent(t *ldtest.T) EventMessage {
 	return *e
 }
 
+// RequireEventWithin waits for the SSE client to report an event, using an explicit timeout
+// instead of the default awaitMessageTimeout.
+//
+// Use this in tests where the expected arrival time is meaningfully shorter (or longer) than
+// the default -- for example, payload-size stress tests where a stalled read should fail fast
+// rather than eat the full default timeout.
+func (c *SSEClient) RequireEventWithin(t *ldtest.T, timeout time.Duration) EventMessage {
+	m, err := c.AwaitMessage(timeout)
+	require.NoError(t, err)
+	if m.Kind != "event" {
+		require.Fail(t, "received an unexpected message", "expected %q but got: %s", "event", m)
+	}
+	require.NotNil(t, m.Event, "missing object field \"event\" on expected \"event\" message")
+	return *m.Event
+}
+
 // RequireError waits for the SSE client in the test service to tell us that it received an error.
 //
 // The test fails and immediately exits if it times out without receiving anything, or if what we
