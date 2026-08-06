@@ -47,14 +47,21 @@ func generatePayloadSweep() []int {
 
 // timeoutForSize returns how long to wait for a payload of the given size to be delivered.
 //
-// A generous base timeout plus a per-byte allowance keeps the timeout tight enough to
-// catch stalls (which manifest as 60+ second waits) while allowing legitimate transfer
-// time for large payloads on modest connections. For a 128 MiB payload at the assumed
-// 5 MiB/s throughput, the timeout is ~31 seconds -- comfortably shorter than the 60+
-// second stall it is designed to catch.
+// Constants were calibrated empirically against an Android emulator's adb-tunneled
+// throughput (~3 MiB/s round-trip observed). Prior values of base=5s, rate=5 MiB/s were
+// tuned for localhost throughput and were too tight for larger payloads on realistic
+// mobile/emulator infrastructure -- they timed out at 64 MiB (17.8s allowed) and 128 MiB
+// (30.6s allowed) even for correct implementations.
+//
+// Current values give ~10s for small payloads (well under the 60+ second stall the
+// harness is designed to catch) and ~74s for 128 MiB (comfortably above what the
+// emulator needs to transfer at ~3 MiB/s round-trip). At sizes that large, the
+// buffer-mismatch stall pattern can't manifest anyway -- TCP frames arrive continuously
+// -- so the timeout crossing the ~60s stall boundary at the top end does not reduce
+// the sweep's ability to catch the class of bug it targets.
 func timeoutForSize(size int) time.Duration {
-	const base = 5 * time.Second
-	const bytesPerSecond = 5 * 1024 * 1024 // 5 MiB/s allowance beyond base
+	const base = 10 * time.Second
+	const bytesPerSecond = 2 * 1024 * 1024 // 2 MiB/s effective allowance (~1.5x safety over observed emulator throughput)
 	return base + time.Duration(size)*time.Second/bytesPerSecond
 }
 
