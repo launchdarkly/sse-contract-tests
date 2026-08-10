@@ -3,6 +3,22 @@
 All notable changes to the project will be documented in this file. This project adheres to [Semantic Versioning](http://semver.org).
 
 
+## [2.32.0](https://github.com/launchdarkly/sse-contract-tests/compare/v2.31.0...v2.32.0) (2026-08-10)
+
+
+### Features
+
+* add payload-size-stress-testable capability and test sweep ([5b5ce16](https://github.com/launchdarkly/sse-contract-tests/commit/5b5ce165f82b94ec47f7fbd1c79897f64a1e7fb5))
+* add payload-size-stress-testable capability and test sweep ([#42](https://github.com/launchdarkly/sse-contract-tests/issues/42)) ([cc2affb](https://github.com/launchdarkly/sse-contract-tests/commit/cc2affb6ecca2a337812c0769b04f884411cc4df))
+* expand sweep to every power of two from 1 through 128 MiB ([d2f4cc6](https://github.com/launchdarkly/sse-contract-tests/commit/d2f4cc66fe12732bb7accf71d5c2e0dab33ace53))
+
+
+### Bug Fixes
+
+* Add GitHub token auth and cross-platform support to downloader script ([#34](https://github.com/launchdarkly/sse-contract-tests/issues/34)) ([7eea884](https://github.com/launchdarkly/sse-contract-tests/commit/7eea884904f6e06c8ef49717f50e313dbf26a3cf))
+* Properly terminate inbound SSE connections ([#22](https://github.com/launchdarkly/sse-contract-tests/issues/22)) ([d898901](https://github.com/launchdarkly/sse-contract-tests/commit/d898901d9589f4a4e1c97dc72585da92ad58b052))
+* retune timeoutForSize based on empirical emulator throughput ([1472e3b](https://github.com/launchdarkly/sse-contract-tests/commit/1472e3b133118d77640d7d8fbe11f55dd7d0399e))
+
 ## [2.31.0](https://github.com/launchdarkly/sse-contract-tests/compare/v2.30.0...v2.31.0) (2026-02-10)
 
 
