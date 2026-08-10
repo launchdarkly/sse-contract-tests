@@ -55,6 +55,20 @@ Implementations of the `EventSource` API in browsers always start with no `Last-
 
 If this capability is enabled, the test harness will expect that any non-null and non-empty string it specifies in the `lastEventId` property of the client configuration will be copied into the `Last-Event-Id` header in the client's initial request, and treated as if it had been received as an `id:` in a previous event.
 
+## Payload size stress testing (capability `"payload-size-stress-testable"`)
+
+This means that the SSE client implementation is willing to be exercised with a sweep of `data:` payload sizes to catch buffer-mismatch stalls.
+
+Some SSE client implementations (or the HTTP stacks they run on top of) exhibit long stalls when the caller-side read buffer is smaller than an intermediate wrapping layer's buffer. In one observed case, a .NET SSE client using a 1024-byte `StreamReader` on top of MAUI Android's `AndroidMessageHandler` — which silently wraps the response body in a `BufferedStream` with a 4096-byte default buffer — stalled 60 to 90 seconds delivering payloads in the ~1 KiB to ~4 KiB range. The root cause was that `BufferedStream` over-drained the underlying Java `InputStream` on the first read, then blocked on a subsequent read waiting for the next chunk of data (which, on an SSE keepalive-driven connection, doesn't arrive until the next server-side heartbeat).
+
+If this capability is enabled, the test harness will send events at every power of two from 1 byte through 128 MiB (2^0 to 2^27), plus one byte on either side of each power of two. Since most stream-wrapping layers choose buffer sizes at powers of two, the +/-1 probes catch sharp transitions in the failure mode. The test verifies that each event is delivered to the test service within a size-scaled time budget; any stall in the client's read loop will trip the timeout and fail the test.
+
+This capability is opt-in for three reasons:
+
+1. The sweep is a stress / robustness test, not a spec-conformance test. An SSE implementation can be fully spec-compliant without passing it.
+2. Implementations with a latent buffer-mismatch behavior that isn't immediately fixable can defer opting in until they've validated the sweep, avoiding a surprise CI failure.
+3. The largest sizes (up to 128 MiB) may exceed reasonable memory/bandwidth defaults for some test environments. Opting in signals that the test service is prepared to allocate and transfer payloads at that scale.
+
 ## Sending a POST request (capability `"post"`)
 
 This means that the caller can tell the SSE client to send a `POST` request instead of a `GET` request, and specify the request body.

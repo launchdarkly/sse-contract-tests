@@ -10,6 +10,7 @@ var AllCapabilities = []string{ //nolint:gochecknoglobals
 	"comments",
 	"headers",
 	"last-event-id",
+	"payload-size-stress-testable",
 	"post",
 	"read-timeout",
 	"report",
@@ -35,6 +36,7 @@ func RunTestSuite(
 		t.Run("comments", DoCommentTests)
 		t.Run("linefeeds", DoLinefeedTests)
 		t.Run("HTTP behavior", DoHTTPBehaviorTests)
+		t.Run("payload size stress", DoPayloadSizeStressTests)
 		t.Run("reconnection", DoReconnectionTests)
 	})
 }
